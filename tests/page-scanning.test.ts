@@ -65,6 +65,9 @@ vi.mock('../lib/blocking/hide', () => ({
     has(element: unknown): boolean {
       return this.elements.has(element);
     }
+    target(element: Element): Element {
+      return element;
+    }
     restoreAll(): number {
       const count = this.elements.size;
       this.elements.clear();

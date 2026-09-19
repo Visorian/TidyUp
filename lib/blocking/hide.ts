@@ -2,6 +2,7 @@ import { presentationFingerprint } from '../candidates/fingerprint';
 import { extractSpecialCandidate, specialPresentationFingerprint } from '../candidates/regions';
 import { isSafeCandidateBoundary } from '../candidates/visibility';
 import type { AdCandidate } from '../shared/types';
+import { findAdContainer, isAdContainer } from './ad-container';
 
 interface StyleChange {
   readonly element: HTMLElement;
@@ -13,6 +14,7 @@ interface StyleChange {
 
 interface Presentation {
   readonly element: HTMLElement;
+  readonly target: HTMLElement;
   readonly kind: AdCandidate['kind'];
   readonly debug: boolean;
   readonly changes: readonly StyleChange[];
@@ -76,6 +78,10 @@ export class PresentationStore {
     return this.entries.has(element);
   }
 
+  target(element: Element): Element {
+    return this.entries.get(element)?.target ?? element;
+  }
+
   apply(
     element: Element,
     probability: number,
@@ -96,14 +102,16 @@ export class PresentationStore {
     if (!debug && probability < threshold) return false;
     const currentFingerprint = fingerprint(element, kind);
     if (currentFingerprint === null) return false;
+    const target = !debug && kind === undefined ? findAdContainer(element) : element;
     const property = debug ? 'outline' : kind === 'background' ? 'background-image' : 'display';
     const color = probability >= threshold ? '#dc2626' : probability <= 0.1 ? '#16a34a' : '#ca8a04';
     this.entries.set(element, {
       element,
+      target,
       kind,
       debug,
       fingerprint: currentFingerprint,
-      changes: [changeStyle(element, property, debug ? `3px solid ${color}` : 'none')],
+      changes: [changeStyle(target, property, debug ? `3px solid ${color}` : 'none')],
     });
     if (kind === 'consent' && !debug) this.unlockScrolling(element);
     return !debug;
@@ -158,12 +166,14 @@ export class PresentationStore {
   }
 
   queueChanges(targets: readonly Node[]): void {
-    for (const element of this.entries.keys()) {
+    for (const [element, entry] of this.entries) {
       const affected = targets.some(
         (target) =>
-          target === element.ownerDocument || element.contains(target) || target.contains(element),
+          target === element.ownerDocument ||
+          entry.target.contains(target) ||
+          target.contains(entry.target),
       );
-      if (!element.isConnected || affected) this.pending.add(element);
+      if (!element.isConnected || !entry.target.isConnected || affected) this.pending.add(element);
     }
   }
 
@@ -178,6 +188,7 @@ export class PresentationStore {
       entry === undefined ||
       (element.isConnected &&
         (entry.kind !== undefined || safePresentation(element)) &&
+        (entry.target === element || isAdContainer(entry.target, entry.element)) &&
         fingerprint(element, entry.kind) === entry.fingerprint &&
         entry.changes.every(
           (change) =>
@@ -186,10 +197,11 @@ export class PresentationStore {
         ))
     )
       return { restored: false, root: null, element };
+    const root = entry.target.isConnected ? entry.target : element.isConnected ? element : null;
     return {
       element,
       restored: this.restore(element),
-      root: element.isConnected ? element : null,
+      root,
     };
   }
 }

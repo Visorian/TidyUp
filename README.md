@@ -24,7 +24,7 @@ For Firefox 140 or newer, open `about:debugging#/runtime/this-firefox`, select L
 
 The default confidence threshold is 90%, configurable from 90% to 100% in Settings. A region is hidden when any rule matches at or above this threshold. Rules are independent; a rule that does not match does not override another matching rule. You can add up to 20 rules of 500 characters each across custom rules and categories, including disabled groups. Disabled categories do not participate in classification. Subscription starter rules cover promotional offers and keep access-restricting paywalls visible.
 
-Hiding a consent overlay does not accept or reject cookies. The dialog wrapper is hidden and page scrolling is unlocked. Use Show hidden to restore the prompt and its scroll lock when you want to choose. Advertising backgrounds are removed without hiding the page content.
+Hiding a consent overlay does not accept or reject cookies. The dialog wrapper is hidden and page scrolling is unlocked. Use Show hidden to restore the prompt and its scroll lock when you want to choose. Advertising backgrounds are removed without hiding the page content. Confirmed ads also collapse surrounding containers when those contain only the ad, labels, and empty spacing. Containers with other content stay visible. Show hidden restores the original layout.
 
 Debug mode outlines candidates instead of hiding them. Red meets the threshold, green is a likely non-match, and yellow is uncertain. Settings changes restore hidden regions. Automatic mode resumes with the updated rules; Manual mode waits for Run now. Disabling or removing every active rule stops scanning and restores hidden content.
 

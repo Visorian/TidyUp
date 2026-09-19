@@ -172,7 +172,6 @@ export class PageSession {
     this.scheduler.cancel();
     this.queue.cancel();
   }
-
   stop(): void {
     this.stopped = true;
     this.settingsRequest++;
@@ -249,6 +248,7 @@ export class PageSession {
       this.metrics.hidden = Math.max(0, this.metrics.hidden - 1);
     }
     if (change.root !== null) {
+      this.queue.forget(change.element);
       this.queue.forget(change.root);
       this.addRoot(change.root);
     }
@@ -287,7 +287,8 @@ export class PageSession {
       this.metrics.hidden++;
       this.hiddenCategories.set(element, matchingCategoryIds(this.configuration.settings, result));
     }
-    if (this.presentations.has(element)) watchPresentation(this.observer, element);
+    if (this.presentations.has(element))
+      watchPresentation(this.observer, this.presentations.target(element));
   }
   private fail(message: string): void {
     this.error = message;
