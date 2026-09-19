@@ -27,6 +27,22 @@ export function isAdvertisementLabel(text: string): boolean {
   );
 }
 
+export function generatedAdLabel(element: Element): string {
+  const view = element.ownerDocument.defaultView;
+  if (view === null) return '';
+  for (const pseudo of ['::before', '::after']) {
+    const style = view.getComputedStyle(element, pseudo);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')
+      continue;
+    const content = style.content.trim();
+    const quote = content[0];
+    if ((quote !== '"' && quote !== "'") || content.at(-1) !== quote) continue;
+    const text = content.slice(1, -1).trim();
+    if (isAdvertisementLabel(text)) return text;
+  }
+  return '';
+}
+
 export function signalLabels(text: string): string[] {
   const labels: string[] = [];
   for (const [label, expression] of SIGNALS) {
@@ -178,6 +194,8 @@ export function collectContentFeatures(
   let images = 0;
   for (const node of nodes) {
     if (node instanceof Element) {
+      const generated = generatedAdLabel(node);
+      if (generated !== '') text.push(generated);
       if (node instanceof HTMLIFrameElement) frames++;
       if (node instanceof HTMLImageElement) images++;
       if (node === element || node.matches('img,iframe')) {

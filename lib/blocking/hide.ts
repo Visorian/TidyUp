@@ -3,6 +3,7 @@ import { extractSpecialCandidate, specialPresentationFingerprint } from '../cand
 import { isSafeCandidateBoundary } from '../candidates/visibility';
 import type { AdCandidate } from '../shared/types';
 import { findAdContainer, isAdContainer } from './ad-container';
+import { adBackgroundColorTarget } from './background-color';
 
 interface StyleChange {
   readonly element: HTMLElement;
@@ -10,6 +11,7 @@ interface StyleChange {
   readonly value: string;
   readonly priority: string;
   readonly applied: string;
+  readonly appliedPriority: string;
 }
 
 interface Presentation {
@@ -34,14 +36,18 @@ function changeStyle(element: HTMLElement, property: string, applied: string): S
     priority: element.style.getPropertyPriority(property),
   };
   element.style.setProperty(property, applied, 'important');
-  return { ...change, applied: element.style.getPropertyValue(property) };
+  return {
+    ...change,
+    applied: element.style.getPropertyValue(property),
+    appliedPriority: element.style.getPropertyPriority(property),
+  };
 }
 
 function restoreStyle(change: StyleChange): void {
   const { element, property, applied, value, priority } = change;
   if (
     element.style.getPropertyValue(property) !== applied ||
-    element.style.getPropertyPriority(property) !== 'important'
+    element.style.getPropertyPriority(property) !== change.appliedPriority
   )
     return;
   if (value === '') element.style.removeProperty(property);
@@ -105,13 +111,16 @@ export class PresentationStore {
     const target = !debug && kind === undefined ? findAdContainer(element) : element;
     const property = debug ? 'outline' : kind === 'background' ? 'background-image' : 'display';
     const color = probability >= threshold ? '#dc2626' : probability <= 0.1 ? '#16a34a' : '#ca8a04';
+    const background = debug ? null : adBackgroundColorTarget(element, target, kind);
+    const changes = [changeStyle(target, property, debug ? `3px solid ${color}` : 'none')];
+    if (background !== null) changes.push(changeStyle(background, 'background-color', ''));
     this.entries.set(element, {
       element,
       target,
       kind,
       debug,
       fingerprint: currentFingerprint,
-      changes: [changeStyle(target, property, debug ? `3px solid ${color}` : 'none')],
+      changes,
     });
     if (kind === 'consent' && !debug) this.unlockScrolling(element);
     return !debug;
@@ -193,7 +202,7 @@ export class PresentationStore {
         entry.changes.every(
           (change) =>
             change.element.style.getPropertyValue(change.property) === change.applied &&
-            change.element.style.getPropertyPriority(change.property) === 'important',
+            change.element.style.getPropertyPriority(change.property) === change.appliedPriority,
         ))
     )
       return { restored: false, root: null, element };

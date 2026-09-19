@@ -1,5 +1,5 @@
 import type { AdCandidate } from '../shared/types';
-import { CARD_CONTAINERS, collectFeatures, metadataLabels } from './features';
+import { CARD_CONTAINERS, collectFeatures, generatedAdLabel, metadataLabels } from './features';
 import { extractSpecialCandidate, hasConsentAncestor } from './regions';
 import { hasPrivateAncestor, isVisible } from './visibility';
 
@@ -10,7 +10,10 @@ const ESSENTIAL =
 function hasContentBoundary(element: Element): boolean {
   if (element.matches(CARD_CONTAINERS + ',iframe,ins') || metadataLabels(element).length > 0)
     return true;
+  const position = element.ownerDocument.defaultView?.getComputedStyle(element).position;
+  if (position === 'fixed' || position === 'sticky') return true;
   for (const child of element.childNodes) {
+    if (child instanceof Element && generatedAdLabel(child) !== '') return true;
     if (child instanceof Element && child.matches('h1,h2,h3,h4,h5,h6,p,img,iframe,picture'))
       return true;
     if (child.nodeType === Node.TEXT_NODE && (child.nodeValue ?? '').trim().length >= 30)
