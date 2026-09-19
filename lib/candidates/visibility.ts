@@ -1,3 +1,5 @@
+import { cachedBoolean, computedStyle } from './read-cache';
+
 const PRIVATE_ELEMENTS =
   'form,input,textarea,select,option,script,style,template,noscript,details:not([open]),[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"],[role="searchbox"]';
 
@@ -28,7 +30,7 @@ export function isSafeCandidateBoundary(element: Element): boolean {
 }
 
 export function isPrivateElement(element: Element): boolean {
-  return element.matches(PRIVATE_ELEMENTS);
+  return cachedBoolean(element, 'private', () => element.matches(PRIVATE_ELEMENTS));
 }
 
 export function hasPrivateAncestor(element: Element): boolean {
@@ -55,6 +57,10 @@ export function isVisible(element: Element): boolean {
 }
 
 export function isHidden(element: Element): boolean {
+  return cachedBoolean(element, 'hidden', () => hidden(element));
+}
+
+function hidden(element: Element): boolean {
   // Light DOM that is not assigned to a slot does not render below a shadow host.
   if (
     element.assignedSlot === null &&
@@ -73,7 +79,7 @@ export function isHidden(element: Element): boolean {
     element.getAttribute('aria-hidden') === 'true'
   )
     return true;
-  const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+  const style = computedStyle(element);
   return (
     style === undefined ||
     style.display === 'none' ||

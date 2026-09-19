@@ -115,7 +115,7 @@ export class ClassificationQueue {
     this.timer = undefined;
   }
 
-  schedule(): void {
+  schedule(backlog = false): void {
     if (this.timer !== undefined || this.active) return;
     if (this.retryAt > 0) {
       this.timer = window.setTimeout(
@@ -125,19 +125,22 @@ export class ClassificationQueue {
           this.retryAt = 0;
           this.suspended = false;
           this.options.wake();
-          this.schedule();
+          this.schedule(true);
         },
         Math.max(0, this.retryAt - Date.now()),
       );
       return;
     }
     if (!this.options.runnable() || this.queue.length === 0) return;
-    this.timer = window.setTimeout(() => {
-      this.timer = undefined;
-      this.classify().catch(() => {
-        this.options.fail('Classification failed; content remains visible.');
-      });
-    }, 100);
+    this.timer = window.setTimeout(
+      () => {
+        this.timer = undefined;
+        this.classify().catch(() => {
+          this.options.fail('Classification failed; content remains visible.');
+        });
+      },
+      backlog ? 0 : 100,
+    );
   }
 
   private async classify(): Promise<void> {
@@ -163,7 +166,7 @@ export class ClassificationQueue {
     } finally {
       this.active = false;
       if (generation === this.options.generation() && this.options.runnable()) this.options.wake();
-      this.schedule();
+      this.schedule(generation === this.options.generation());
     }
   }
 
@@ -200,7 +203,15 @@ export class ClassificationQueue {
       const started = performance.now();
       while (index < original.length && performance.now() - started < 6) {
         const pending = original[index++];
-        if (pending !== undefined && this.options.current(pending)) batch.push(pending);
+        if (pending === undefined || !this.options.current(pending)) continue;
+        const cached = this.options.cacheEnabled()
+          ? this.cache.get(pending.fingerprint)
+          : undefined;
+        if (cached === undefined) batch.push(pending);
+        else {
+          this.metrics.cacheHits++;
+          this.decisions.push({ pending, result: cached });
+        }
       }
     }
     return batch;

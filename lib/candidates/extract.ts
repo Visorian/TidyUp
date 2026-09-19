@@ -1,3 +1,4 @@
+import { CandidateReadCache, computedStyle, withCandidateReads } from './read-cache';
 import type { AdCandidate } from '../shared/types';
 import { CARD_CONTAINERS, collectFeatures, generatedAdLabel, metadataLabels } from './features';
 import { extractSpecialCandidate, hasConsentAncestor } from './regions';
@@ -10,14 +11,14 @@ const ESSENTIAL =
 function hasContentBoundary(element: Element): boolean {
   if (element.matches(CARD_CONTAINERS + ',iframe,ins') || metadataLabels(element).length > 0)
     return true;
-  const position = element.ownerDocument.defaultView?.getComputedStyle(element).position;
+  const position = computedStyle(element)?.position;
   if (position === 'fixed' || position === 'sticky') return true;
   for (const child of element.childNodes) {
-    if (child instanceof Element && generatedAdLabel(child) !== '') return true;
     if (child instanceof Element && child.matches('h1,h2,h3,h4,h5,h6,p,img,iframe,picture'))
       return true;
     if (child.nodeType === Node.TEXT_NODE && (child.nodeValue ?? '').trim().length >= 30)
       return true;
+    if (child instanceof Element && generatedAdLabel(child) !== '') return true;
   }
   return false;
 }
@@ -26,12 +27,17 @@ export function extractCandidate(
   element: Element,
   id: string,
   pageHost: string,
+  reads: Readonly<CandidateReadCache> = new CandidateReadCache(),
 ): AdCandidate | null {
+  return withCandidateReads(reads, () => extract(element, id, pageHost));
+}
+
+function extract(element: Element, id: string, pageHost: string): AdCandidate | null {
   const special = extractSpecialCandidate(element, id, pageHost);
   if (special !== null) return special;
-  if (element.matches('dialog,[aria-modal="true"]') || hasConsentAncestor(element)) return null;
   if (!element.matches(CONTAINERS) || element.matches(ESSENTIAL) || hasPrivateAncestor(element))
     return null;
+  if (element.matches('dialog,[aria-modal="true"]') || hasConsentAncestor(element)) return null;
   if (element.childNodes.length > 24 || !hasContentBoundary(element) || !isVisible(element))
     return null;
   const selection = element.ownerDocument.getSelection();

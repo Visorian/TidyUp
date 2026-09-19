@@ -1,3 +1,4 @@
+import { cachedBoolean, computedStyle } from './read-cache';
 import type { AdCandidate } from '../shared/types';
 import {
   type CandidateContent,
@@ -25,9 +26,13 @@ const ESSENTIAL =
 const CONSENT = /\b(?:cookies?|consent|tracking|einwilligung|zustimmung|datenschutz)\b/iu;
 
 function isOverlay(element: Element): boolean {
+  return cachedBoolean(element, 'overlay', () => overlay(element));
+}
+
+function overlay(element: Element): boolean {
   if (element.matches('dialog,header,footer') || element.matches(ESSENTIAL)) return false;
   if (element.matches(DIALOG)) return true;
-  const position = element.ownerDocument.defaultView?.getComputedStyle(element).position;
+  const position = computedStyle(element)?.position;
   return position === 'fixed' || position === 'sticky';
 }
 
@@ -107,6 +112,10 @@ function consentContent(element: Element, hiddenRoot = false): CandidateContent 
 }
 
 export function hasConsentAncestor(element: Element): boolean {
+  return cachedBoolean(element, 'consent-ancestor', () => consentAncestor(element));
+}
+
+function consentAncestor(element: Element): boolean {
   let parent = composedParent(element);
   for (let depth = 0; parent !== null && depth < 64; depth += 1) {
     if (parent.matches(DIALOG) || (isOverlay(parent) && consentContent(parent) !== null))
@@ -144,6 +153,11 @@ export function extractSpecialCandidate(
   id: string,
   pageHost: string,
 ): AdCandidate | null {
+  const background = element.matches('html,body,div,section')
+    ? computedStyle(element)?.backgroundImage
+    : undefined;
+  const hasBackground = background !== undefined && /url\(/iu.test(background);
+  if (!hasBackground && !isOverlay(element)) return null;
   if (hasPrivateAncestor(element) || !isVisible(element) || hasConsentAncestor(element))
     return null;
   const selection = element.ownerDocument.getSelection();
@@ -161,9 +175,7 @@ export function extractSpecialCandidate(
       display: displayFeatures(element, content.text, frames, images),
     };
   }
-  if (!isBackgroundContainer(element)) return null;
-  const background = element.ownerDocument.defaultView?.getComputedStyle(element).backgroundImage;
-  if (background === undefined || !/url\(/iu.test(background)) return null;
+  if (!hasBackground || background === undefined || !isBackgroundContainer(element)) return null;
   const description = elementDescription(element);
   return {
     id,

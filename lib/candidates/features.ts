@@ -1,3 +1,4 @@
+import { cachedAdLabel, computedStyle } from './read-cache';
 import { LIMITS } from '../config/defaults';
 import type { CandidateDisplay } from '../shared/types';
 import { isPublicHost } from '../shared/validation';
@@ -28,10 +29,15 @@ export function isAdvertisementLabel(text: string): boolean {
 }
 
 export function generatedAdLabel(element: Element): string {
+  return cachedAdLabel(element, () => generatedLabel(element));
+}
+
+function generatedLabel(element: Element): string {
   const view = element.ownerDocument.defaultView;
   if (view === null) return '';
   for (const pseudo of ['::before', '::after']) {
-    const style = view.getComputedStyle(element, pseudo);
+    const style = computedStyle(element, pseudo);
+    if (style === undefined) continue;
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')
       continue;
     const content = style.content.trim();
@@ -125,7 +131,7 @@ export function displayFeatures(
   frames: number,
   images: number,
 ): CandidateDisplay {
-  const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+  const style = computedStyle(element);
   const bounds = element.getBoundingClientRect();
   const position = style?.position;
   return {

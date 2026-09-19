@@ -2,6 +2,7 @@
 import { browser } from 'wxt/browser';
 import { PresentationStore, watchPresentation } from '../blocking/hide';
 import { enumerateElements, extractCandidate } from '../candidates/extract';
+import { CandidateReadCache } from '../candidates/read-cache';
 import { candidateFingerprint } from '../candidates/fingerprint';
 import { activeRules, matchingCategoryIds, countHiddenCategories } from '../config/categories';
 import type { CandidateClassification, PageStatus, PublicSettings } from '../shared/types';
@@ -230,11 +231,13 @@ export class PageSession {
     if (!this.runnable(true) || this.checkNavigation()) return;
     const started = performance.now();
     let visited = 0;
+    const reads = new CandidateReadCache();
     while (visited < 100 && performance.now() - started < 6) {
       if (
         this.restoreNext() ||
         (this.runnable() && (this.rehideNext() || this.queue.applyNext()))
       ) {
+        reads.clear();
         visited++;
         continue;
       }
@@ -251,7 +254,7 @@ export class PageSession {
         continue;
       }
       visited++;
-      this.inspect(next.value);
+      this.inspect(next.value, reads);
     }
     this.queue.schedule();
     if (
@@ -283,14 +286,19 @@ export class PageSession {
     }
     return true;
   }
-  private inspect(element: Element): void {
+  private inspect(element: Element, reads: Readonly<CandidateReadCache>): void {
     this.metrics.scanned++;
     if (element.shadowRoot !== null && !this.observedShadows.has(element.shadowRoot)) {
       this.observedShadows.add(element.shadowRoot);
       observeMutations(this.observer, element.shadowRoot);
     }
     if (this.presentations.has(element) || !element.isConnected) return;
-    const candidate = extractCandidate(element, `candidate_${++this.sequence}`, location.hostname);
+    const candidate = extractCandidate(
+      element,
+      `candidate_${++this.sequence}`,
+      location.hostname,
+      reads,
+    );
     if (candidate === null) return;
     const fingerprint = candidateFingerprint(candidate);
     if (this.queue.add({ element, candidate, fingerprint, generation: this.generation }))
