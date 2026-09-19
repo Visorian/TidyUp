@@ -61,23 +61,8 @@
           </div>
           <div class="settings-scroll">
             <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules">
-              <h2>Choose what to hide</h2>
-              <p class="intro">
-                Tell TidyUp what to hide. Matching regions disappear; everything else stays.
-              </p>
-              <div class="starter-section">
-                <button id="add-starter-rules" type="button" aria-describedby="starter-rules-hint">
-                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" /></svg
-                  >Add starter categories
-                </button>
-                <p id="starter-rules-hint" class="hint">
-                  Ads, cookie consent, and subscription prompts. Hiding consent does not accept
-                  cookies; hiding a subscription prompt does not unlock paid content.
-                </p>
-              </div>
               <p id="rules-empty" class="empty-state">
-                No rules yet. Start with the basics above, or write your own below.
+                No rules yet. Create a category or add a custom rule.
               </p>
               <div id="categories" aria-label="Rule categories"></div>
               <div class="new-category">
@@ -104,6 +89,17 @@
                 ><button id="add-rule" type="button">Add rule</button>
               </div>
               <p id="rule-notice" role="status" aria-live="polite"></p>
+              <details class="starter-section">
+                <summary>Starter categories</summary>
+                <p id="starter-rules-hint" class="hint">
+                  Ads, cookie consent, and subscription prompts. Your existing rules are kept.
+                  Hiding consent does not accept cookies; hiding subscription prompts does not
+                  unlock paid content.
+                </p>
+                <button id="add-starter-rules" type="button" aria-describedby="starter-rules-hint">
+                  Add starter categories
+                </button>
+              </details>
             </section>
             <section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" hidden>
               <h2>Connect your provider</h2>
@@ -115,33 +111,39 @@
                 <option value="typesafe">TypeSafe direct</option>
                 <option value="openrouter">OpenRouter</option>
               </select>
+              <div class="field">
+                <label for="api-key">API key</label>
+                <input
+                  id="api-key"
+                  name="api-key"
+                  type="password"
+                  autocomplete="new-password"
+                  spellcheck="false"
+                  placeholder="Enter your provider key"
+                  aria-describedby="key-status key-hint"
+                />
+                <p id="key-status" class="hint" role="status">Loading connection…</p>
+                <p id="key-hint" class="hint">
+                  Stored only in this browser. Leave blank to keep your saved key.
+                </p>
+                <button id="clear-key" type="button" class="text-button danger" hidden>
+                  Remove saved key
+                </button>
+              </div>
               <div id="model-field" class="field" hidden>
-                <label for="model">Model</label
-                ><select id="model" name="model">
+                <label for="model">Model</label>
+                <select id="model" name="model">
                   <option value="jev">Jev</option>
                 </select>
               </div>
-              <p id="key-status" class="hint" role="status">Loading connection…</p>
-              <label for="api-key">API key</label>
-              <input
-                id="api-key"
-                name="api-key"
-                type="password"
-                autocomplete="new-password"
-                spellcheck="false"
-                placeholder="Enter your provider key"
-                aria-describedby="key-hint"
-              />
-              <p id="key-hint" class="hint">
-                Stored only in this browser. Leave blank to keep your saved key.
-              </p>
-              <button id="test" type="button" class="connection-test">
-                Save and test connection
-              </button>
-              <p class="hint">Tests a fixed example without sending page content.</p>
-              <button id="clear-key" type="button" class="text-button danger">
-                Clear this provider's key and save
-              </button>
+              <div class="connection-check">
+                <button id="test" type="button" aria-describedby="test-hint" disabled>
+                  Test connection
+                </button>
+                <p id="test-hint" class="hint">
+                  Tests a fixed example without sending page content.
+                </p>
+              </div>
               <div class="privacy-note">
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Zm-4 9 3 3 5-6" />

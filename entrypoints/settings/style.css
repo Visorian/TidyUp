@@ -82,16 +82,14 @@ label:not(.switch-row) {
   margin-bottom: 7px;
 }
 .starter-section {
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 18px;
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 16px;
 }
-#add-starter-rules {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: transparent;
-}
-#add-starter-rules:hover {
-  border-color: var(--accent);
+.starter-section summary {
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
 }
 .empty-state {
   color: var(--muted);
@@ -211,8 +209,10 @@ h3 {
 .number-field input {
   width: 82px;
 }
-.connection-test {
-  width: 100%;
+.connection-check {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 16px;
 }
 .danger {
   color: var(--error) !important;

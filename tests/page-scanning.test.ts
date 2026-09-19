@@ -223,7 +223,7 @@ it('resumes the remaining scan when queued candidates all become invalid before 
   expect(status()).toMatchObject({ error: '', metrics: { dropped: 0, queued: 0 } });
 });
 
-function control(type: 'REVEAL' | 'SETTINGS_CHANGED'): void {
+function control(type: 'REVEAL' | 'HIDE_AGAIN' | 'RESCAN' | 'SETTINGS_CHANGED'): void {
   for (const listener of runtime.listeners) listener({ type }, {}, () => {});
 }
 
@@ -322,3 +322,125 @@ function requireElement(value: Readonly<TestElement> | undefined): Readonly<Test
   if (value === undefined) throw new Error('Missing candidate');
   return value;
 }
+
+it('rehides unchanged regions promptly without classification when caching is disabled', async () => {
+  settings = {
+    ...DEFAULT_SETTINGS,
+    cacheEnabled: false,
+    categories: [
+      { id: 'ads', name: 'Ads', enabled: true, rules: ['Hide ads.'] },
+      { id: 'subscriptions', name: 'Subscriptions', enabled: true, rules: ['Hide subscriptions.'] },
+    ],
+  };
+  ruleProbabilities = [0.99, 0.95];
+  runtime.applied.mockReturnValue(true);
+  appendCandidates(3, 'Advertisement');
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(classified).toHaveLength(3);
+  control('REVEAL');
+  expect(status()).toMatchObject({ paused: true, metrics: { hidden: 0 }, hiddenByCategory: {} });
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({
+    paused: false,
+    metrics: { hidden: 3 },
+    hiddenByCategory: { ads: 3, subscriptions: 3 },
+  });
+  expect(runtime.applied).toHaveBeenCalledTimes(6);
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(classified).toHaveLength(3);
+  control('REVEAL');
+  control('REVEAL');
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({ metrics: { hidden: 3 } });
+  expect(classified).toHaveLength(3);
+});
+
+it('reevaluates edited regions instead of replaying old hidden decisions', async () => {
+  runtime.applied.mockReturnValue(true);
+  const element = requireElement(appendCandidates(1, 'Advertisement')[0]);
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(3000);
+  control('REVEAL');
+  Object.defineProperty(element, 'textContent', {
+    value: 'Changed region requiring a new decision',
+  });
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({ paused: false, metrics: { hidden: 0 } });
+  expect(runtime.applied).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(classified).toEqual(['Advertisement 0', 'Changed region requiring a new decision']);
+});
+
+it('discards revealed decisions after settings changes even if their regions are unchanged', async () => {
+  runtime.applied.mockReturnValue(true);
+  appendCandidates(1, 'Advertisement');
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(3000);
+  control('REVEAL');
+  settings = { ...settings, rules: ['Hide subscriptions.'] };
+  control('SETTINGS_CHANGED');
+  await vi.advanceTimersByTimeAsync(1);
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({ metrics: { hidden: 0 } });
+  expect(runtime.applied).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(classified).toHaveLength(2);
+});
+
+it('discards revealed decisions on navigation and leaves manual activation waiting', async () => {
+  settings = { ...settings, activation: 'manual' };
+  runtime.applied.mockReturnValue(true);
+  appendCandidates(1, 'Advertisement');
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(1);
+  control('RESCAN');
+  await vi.advanceTimersByTimeAsync(3000);
+  control('REVEAL');
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({
+    paused: false,
+    waitingForActivation: false,
+    metrics: { hidden: 1 },
+  });
+  control('REVEAL');
+  vi.stubGlobal('location', new URL('https://news.example.org/next'));
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(status()).toMatchObject({
+    paused: false,
+    waitingForActivation: true,
+    metrics: { hidden: 0 },
+  });
+  expect(classified).toHaveLength(1);
+});
+
+it('does not replay detached regions or reuse revealed decisions for an explicit rescan', async () => {
+  runtime.applied.mockReturnValue(true);
+  const element = requireElement(appendCandidates(1, 'Advertisement')[0]);
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(3000);
+  control('REVEAL');
+  Object.defineProperty(element, 'isConnected', { value: false, configurable: true });
+  control('HIDE_AGAIN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({ metrics: { hidden: 0 } });
+  expect(runtime.applied).toHaveBeenCalledOnce();
+  Object.defineProperty(element, 'isConnected', { value: true });
+  control('REVEAL');
+  control('RESCAN');
+  await vi.advanceTimersByTimeAsync(100);
+  expect(status()).toMatchObject({ metrics: { hidden: 0 } });
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(classified).toHaveLength(2);
+});

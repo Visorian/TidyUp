@@ -18,6 +18,9 @@ let current: PublicSettings | undefined;
 let tabId: number | undefined;
 let host = '';
 let pageAvailable = false;
+let showingHidden = false;
+let pageRequest = 0;
+let polling = false;
 let hiddenByCategory: Readonly<Record<string, number>> = {};
 
 function render(): void {
@@ -43,6 +46,7 @@ function render(): void {
   icon.setAttribute('aria-label', provider);
   element('#connection', HTMLElement).hidden = current.configured;
   reveal.disabled = !pageAvailable;
+  reveal.setAttribute('aria-pressed', String(showingHidden));
   rescan.textContent = current.settings.activation === 'manual' ? 'Run now' : 'Scan again';
   element('#activation', HTMLElement).textContent =
     current.settings.activation === 'manual' ? 'Manual activation' : 'Automatic activation';
@@ -114,19 +118,22 @@ function renderCache(): void {
 }
 
 async function refreshPage(): Promise<void> {
+  const request = ++pageRequest;
   if (tabId === undefined || !isPublicHost(host)) {
     status.textContent = 'Open a public website to enable blocking.';
     return;
   }
   try {
     const page = await pageStatus(tabId);
+    if (request !== pageRequest) return;
     pageAvailable = true;
+    showingHidden = page.paused;
     hiddenByCategory = page.hiddenByCategory;
     element('#blocked', HTMLElement).textContent = String(page.metrics.hidden);
     if (page.error !== '') status.textContent = page.error;
     else if (page.waitingForActivation)
       status.textContent = 'Waiting for Run now. No content is being classified.';
-    else if (page.paused) status.textContent = 'Content revealed. Run again to resume.';
+    else if (page.paused) status.textContent = 'Hidden content is temporarily visible.';
     else if (page.enabled)
       status.textContent =
         current?.settings.debug === true
@@ -134,13 +141,16 @@ async function refreshPage(): Promise<void> {
           : 'Following new content on this page.';
     else status.textContent = 'Blocking is off on this page.';
   } catch {
+    if (request !== pageRequest) return;
     pageAvailable = false;
+    showingHidden = false;
     hiddenByCategory = {};
     status.textContent = 'Reload this tab to start the extension.';
   }
 }
 
 async function perform(action: () => Promise<void>): Promise<void> {
+  pageRequest++;
   controls.disabled = true;
   notice.textContent = '';
   try {
@@ -192,14 +202,14 @@ clearCache.addEventListener('click', () => {
   });
 });
 
-async function actOnPage(type: 'REVEAL' | 'RESCAN'): Promise<void> {
+async function actOnPage(type: 'REVEAL' | 'HIDE_AGAIN' | 'RESCAN'): Promise<void> {
   if (tabId === undefined) return;
   await browser.tabs.sendMessage(tabId, { type } satisfies ExtensionMessage);
   await refreshPage();
 }
 
 reveal.addEventListener('click', () => {
-  run(() => actOnPage('REVEAL'));
+  run(() => actOnPage(showingHidden ? 'HIDE_AGAIN' : 'REVEAL'));
 });
 rescan.addEventListener('click', () => {
   run(() => actOnPage('RESCAN'));
@@ -218,4 +228,25 @@ run(async () => {
   }
   element('#host', HTMLElement).textContent = host === '' ? 'No website selected' : host;
   await refreshPage();
+});
+
+async function refreshStatus(): Promise<void> {
+  if (controls.disabled || polling || !pageAvailable) return;
+  polling = true;
+  try {
+    await refreshPage();
+    if (!controls.disabled) render();
+  } finally {
+    polling = false;
+  }
+}
+
+const statusTimer = window.setInterval(() => {
+  refreshStatus().catch((error: unknown) => {
+    notice.textContent = errorMessage(error);
+  });
+}, 1000);
+window.addEventListener('pagehide', () => {
+  window.clearInterval(statusTimer);
+  pageRequest++;
 });

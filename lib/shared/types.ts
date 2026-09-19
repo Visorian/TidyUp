@@ -101,6 +101,7 @@ export type ExtensionMessage =
   | { readonly type: 'SETTINGS_CHANGED' }
   | { readonly type: 'GET_STATUS' }
   | { readonly type: 'REVEAL' }
+  | { readonly type: 'HIDE_AGAIN' }
   | { readonly type: 'RESCAN' };
 
 export type ClassificationResponse =

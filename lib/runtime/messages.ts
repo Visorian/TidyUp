@@ -16,6 +16,7 @@ interface PageControls {
   readonly status: () => unknown;
   readonly settingsChanged: () => void;
   readonly reveal: () => void;
+  readonly hideAgain: () => void;
   readonly rescan: () => void;
 }
 
@@ -34,6 +35,9 @@ export function receivePageMessage(
       break;
     case 'REVEAL':
       controls.reveal();
+      break;
+    case 'HIDE_AGAIN':
+      controls.hideAgain();
       break;
     case 'RESCAN':
       controls.rescan();

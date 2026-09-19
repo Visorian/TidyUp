@@ -61,19 +61,17 @@
           <p id="status" role="status">Checking this page…</p>
           <div class="page-actions">
             <button id="rescan" type="button" class="primary" disabled>Scan again</button>
-            <button id="reveal" type="button" disabled>Show hidden</button>
+            <button id="reveal" type="button" aria-pressed="false" disabled>Show hidden</button>
           </div>
         </section>
         <section class="category-section" aria-labelledby="categories-title">
           <div class="category-heading">
-            <h2 id="categories-title">What to hide</h2>
+            <h2 id="categories-title">Rules</h2>
             <a href="settings.html#rules">Edit</a>
           </div>
           <p class="category-hint">Switches apply across websites.</p>
           <div id="categories"></div>
-          <p id="categories-empty" class="category-hint" hidden>
-            <a href="settings.html#rules">Add starter categories or create your own.</a>
-          </p>
+          <p id="categories-empty" class="category-hint" hidden>No categories yet.</p>
           <p id="custom-rules" class="category-hint" hidden></p>
         </section>
         <div class="cache-section">

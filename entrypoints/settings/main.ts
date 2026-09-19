@@ -13,6 +13,8 @@ const controls = element('#controls', HTMLFieldSetElement);
 const provider = element('#provider', HTMLSelectElement);
 const model = element('#model', HTMLSelectElement);
 const key = element('#api-key', HTMLInputElement);
+const clearKey = element('#clear-key', HTMLButtonElement);
+const connectionTest = element('#test', HTMLButtonElement);
 const activation = element('#activation', HTMLSelectElement);
 const enabled = element('#enabled', HTMLInputElement);
 const threshold = element('#threshold', HTMLInputElement);
@@ -22,6 +24,7 @@ const sites = element('#sites', HTMLTextAreaElement);
 const status = element('#status', HTMLParagraphElement);
 const error = element('#error', HTMLParagraphElement);
 let current: PublicSettings | undefined;
+let removeKey = false;
 
 function selectedProvider(): Provider {
   if (provider.value === 'typesafe' || provider.value === 'openrouter') return provider.value;
@@ -32,14 +35,35 @@ function showKeyStatus(): void {
   const message = element('#key-status', HTMLElement);
   element('#model-field', HTMLElement).hidden = provider.value !== 'openrouter';
   if (current === undefined) return;
-  if (provider.value === current.settings.provider) {
+  const sameProvider = provider.value === current.settings.provider;
+  clearKey.hidden = !sameProvider || !current.configured;
+  clearKey.textContent = removeKey ? 'Keep saved key' : 'Remove saved key';
+  key.disabled = removeKey;
+  if (removeKey) {
+    message.textContent = 'The saved key will be removed when you save.';
+  } else if (sameProvider) {
     message.textContent = current.configured
       ? 'A key is saved for this provider.'
       : 'No key is saved for this provider.';
   } else {
-    message.textContent =
-      'Save to switch providers. A previously saved key for this provider will be kept.';
+    message.textContent = 'A previously saved key for this provider will be kept.';
   }
+  updateConnectionTest();
+}
+
+function updateConnectionTest(): void {
+  if (current === undefined) return;
+  const changed =
+    provider.value !== current.settings.provider ||
+    (provider.value === 'openrouter' && model.value !== current.settings.model) ||
+    key.value.trim() !== '' ||
+    removeKey;
+  connectionTest.disabled = changed || !current.configured;
+  element('#test-hint', HTMLElement).textContent = changed
+    ? 'Save your connection changes before testing.'
+    : current.configured
+      ? 'Tests a fixed example without sending page content.'
+      : 'Add and save an API key before testing.';
 }
 
 function render(): void {
@@ -54,6 +78,7 @@ function render(): void {
   setRules(current.settings);
   sites.value = current.settings.disabledSites.join('\n');
   key.value = '';
+  removeKey = false;
   showKeyStatus();
 }
 
@@ -80,18 +105,16 @@ function readSettings(): Settings {
   return settings;
 }
 
-async function save(clearKey = false): Promise<void> {
+async function save(): Promise<void> {
   const settings = readSettings();
   const apiKey = key.value.trim();
   current = await sendSettings({
     type: 'SAVE_SETTINGS',
     settings,
-    ...(clearKey ? { clearKey: true } : apiKey === '' ? {} : { apiKey }),
+    ...(removeKey ? { clearKey: true } : apiKey === '' ? {} : { apiKey }),
   });
   render();
-  status.textContent = clearKey
-    ? 'Settings saved. The selected provider’s key was cleared.'
-    : 'Settings saved.';
+  status.textContent = 'Settings saved.';
 }
 
 async function perform(action: () => Promise<void>): Promise<void> {
@@ -120,11 +143,16 @@ form.addEventListener('submit', (event) => {
 
 provider.addEventListener('change', () => {
   key.value = '';
+  removeKey = false;
   showKeyStatus();
 });
 
-element('#clear-key', HTMLElement).addEventListener('click', () => {
-  if (form.reportValidity()) run(() => save(true));
+key.addEventListener('input', updateConnectionTest);
+model.addEventListener('change', updateConnectionTest);
+clearKey.addEventListener('click', () => {
+  removeKey = !removeKey;
+  key.value = '';
+  showKeyStatus();
 });
 
 element('#clear-cache', HTMLButtonElement).addEventListener('click', () => {
@@ -134,11 +162,10 @@ element('#clear-cache', HTMLButtonElement).addEventListener('click', () => {
   });
 });
 
-element('#test', HTMLElement).addEventListener('click', () => {
-  if (!form.reportValidity()) return;
+connectionTest.addEventListener('click', () => {
+  if (connectionTest.disabled) return;
   run(async () => {
-    await save();
-    status.textContent = 'Settings saved. Testing connection…';
+    status.textContent = 'Testing connection…';
     const response: unknown = await browser.runtime.sendMessage({
       type: 'TEST_CONNECTION',
     } satisfies ExtensionMessage);

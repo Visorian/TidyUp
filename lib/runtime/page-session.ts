@@ -1,4 +1,4 @@
-/* oxlint-disable import/max-dependencies -- Category attribution belongs to the existing page presentation lifecycle. */
+/* oxlint-disable import/max-dependencies, eslint/max-lines -- Keep bounded hidden-decision replay with the page presentation lifecycle. */
 import { browser } from 'wxt/browser';
 import { PresentationStore, watchPresentation } from '../blocking/hide';
 import { enumerateElements, extractCandidate } from '../candidates/extract';
@@ -11,8 +11,15 @@ import { IdleScheduler, createPageActivation } from './scheduler';
 import { MutationRoots, observeMutations } from './mutation-queue';
 import { ClassificationQueue, type PendingCandidate } from './classification-queue';
 
+interface HiddenDecision {
+  readonly pending: PendingCandidate;
+  readonly result: CandidateClassification;
+  readonly categories: readonly string[];
+}
+
 export class PageSession {
-  private readonly hiddenCategories = new Map<Element, readonly string[]>();
+  private readonly hiddenDecisions = new Map<Element, HiddenDecision>();
+  private revealedDecisions: HiddenDecision[] = [];
   private configuration: PublicSettings | null = null;
   private readonly presentations = new PresentationStore();
   private readonly roots = new MutationRoots();
@@ -85,8 +92,17 @@ export class PageSession {
         });
       },
       reveal: () => {
+        if (this.checkNavigation() || this.activation.paused) return;
+        const decisions = [...this.hiddenDecisions.values(), ...this.revealedDecisions];
         this.activation.reveal();
         this.reset();
+        this.revealedDecisions = decisions;
+      },
+      hideAgain: () => {
+        if (this.checkNavigation() || !this.activation.paused) return;
+        this.activation.run();
+        this.begin();
+        this.schedule(0);
       },
       rescan: () => {
         this.checkNavigation();
@@ -114,7 +130,9 @@ export class PageSession {
       paused: this.activation.paused,
       waitingForActivation: this.allowed() && this.activation.waiting,
       error: this.error,
-      hiddenByCategory: countHiddenCategories([...this.hiddenCategories.values()]),
+      hiddenByCategory: countHiddenCategories(
+        [...this.hiddenDecisions.values()].map((decision) => decision.categories),
+      ),
       metrics: {
         ...this.metrics,
         ...this.queue.metrics,
@@ -162,7 +180,8 @@ export class PageSession {
     this.observedShadows = new WeakSet();
     this.metrics.restored += this.presentations.restoreAll();
     this.metrics.hidden = 0;
-    this.hiddenCategories.clear();
+    this.hiddenDecisions.clear();
+    this.revealedDecisions = [];
     this.roots.clear();
     this.queue.reset();
     this.walker = null;
@@ -212,7 +231,10 @@ export class PageSession {
     const started = performance.now();
     let visited = 0;
     while (visited < 100 && performance.now() - started < 6) {
-      if (this.restoreNext() || (this.runnable() && this.queue.applyNext())) {
+      if (
+        this.restoreNext() ||
+        (this.runnable() && (this.rehideNext() || this.queue.applyNext()))
+      ) {
         visited++;
         continue;
       }
@@ -235,15 +257,22 @@ export class PageSession {
     if (
       this.presentations.hasPending ||
       (!this.queue.full && (this.walker !== null || this.roots.size > 0)) ||
-      this.queue.hasDecisions
+      this.queue.hasDecisions ||
+      this.revealedDecisions.length > 0
     )
       this.schedule(0);
+  }
+  private rehideNext(): boolean {
+    const decision = this.revealedDecisions.shift();
+    if (decision === undefined) return false;
+    this.apply({ ...decision.pending, generation: this.generation }, decision.result);
+    return true;
   }
   private restoreNext(): boolean {
     const change = this.presentations.restoreNext();
     if (change === undefined) return false;
     if (change.restored) {
-      this.hiddenCategories.delete(change.element);
+      this.hiddenDecisions.delete(change.element);
       this.metrics.restored++;
       this.metrics.hidden = Math.max(0, this.metrics.hidden - 1);
     }
@@ -285,7 +314,11 @@ export class PageSession {
     const { element, candidate } = pending;
     if (this.presentations.apply(element, result.probability, threshold, debug, candidate.kind)) {
       this.metrics.hidden++;
-      this.hiddenCategories.set(element, matchingCategoryIds(this.configuration.settings, result));
+      this.hiddenDecisions.set(element, {
+        pending,
+        result,
+        categories: matchingCategoryIds(this.configuration.settings, result),
+      });
     }
     if (this.presentations.has(element))
       watchPresentation(this.observer, this.presentations.target(element));
