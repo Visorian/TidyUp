@@ -1,8 +1,44 @@
 # Golem rendering and cleanup measurements
 
-Measured on 2026-09-19 against revision `3b722a4`, using the shared Chromium window and native DevTools Protocol. No implementation changes were made for this measurement.
+Measured on 2026-09-19 using the shared Chromium window and native DevTools Protocol. The baseline used revision `3b722a4`; the optimized implementation used `60a2575`.
 
-Golem's main content painted within about one second. The tracked ads and advertising background in the initial viewport disappeared by 7.5 to 8.0 seconds after navigation. Repeated DOM/style checks and scheduling delays are the first optimization targets.
+The optimized implementation reduced median sampled extension CPU from 2.04 s to 0.52 s over the 45-second observation window. Median time until the tracked ads and advertising background disappeared fell from 7.84 s to 6.22 s. A subscription banner remained visible in all three optimized trials, so full viewport cleanup was not achieved.
+
+## Remeasurement after optimizations 1 and 2
+
+Revision `60a2575` implements the first two opportunities below:
+
+- [Candidate reads](lib/candidates/read-cache.ts) share computed styles, generated ad labels, and visibility/ancestor checks within each synchronous scan slice. Cheap structural checks run first. Shared reads are cleared after presentation work and discarded before yielding; validation before hiding remains fresh.
+- [Queued classifications](lib/runtime/classification-queue.ts) keep the initial 100 ms gathering delay but dispatch an existing backlog without repeating it. Dispatch also rechecks the memory cache. Idle preparation, single-flight requests, generation checks, cooldowns, and retry limits remain in place.
+
+The same browser, viewport, settings, retained caches, sampling method, and 45-second observation windows were used. Three valid trials stayed in the foreground. A fourth trial changed documents, recorded background samples, and produced an incomplete CPU profile; it was excluded and replaced. Live advertising varied between reloads, so this is a repeat-visit comparison rather than a controlled identical-page benchmark.
+
+| Optimized trial | First contentful paint | Largest contentful paint | First region hidden | Ads and background clear | Sampled TidyUp CPU, full 45 s | Final hidden count |
+| --------------- | ---------------------: | -----------------------: | ------------------: | -----------------------: | ----------------------------: | -----------------: |
+| 1               |                 5.69 s |                   5.69 s |              6.22 s |                   6.22 s |                        0.51 s |                 14 |
+| 2               |                 1.06 s |                   1.27 s |              5.83 s |                   7.34 s |                        0.69 s |                 15 |
+| 3               |                 0.66 s |                   0.66 s |              4.50 s |                   6.01 s |                        0.52 s |                 16 |
+
+The ads-only measurement uses the same tracked slots and body color as the baseline but excludes the surviving subscription banner. The last samples showing ads or the advertising background were at 5.72, 6.84, and 5.51 seconds. They stayed clear afterward through the end of each trial.
+
+| Median across three valid trials     | Baseline |   Optimized | Observation                             |
+| ------------------------------------ | -------: | ----------: | --------------------------------------- |
+| Sampled extension CPU, full 45 s     |   2.04 s |      0.52 s | 74% lower                               |
+| Ads and advertising background clear |   7.84 s |      6.22 s | 1.62 s earlier, about 21%               |
+| First region hidden                  |   3.51 s |      5.83 s | 2.32 s later                            |
+| Entire tracked viewport clear        |   7.84 s | Not reached | Subscription banner remained after 45 s |
+
+CPU use and completion of ad cleanup improved in these samples, but initial hiding did not. Paint timings also varied substantially; no page-paint improvement is claimed. Because both changes shipped together, these measurements do not isolate their individual effects.
+
+Inspected-element counts were 6,995, 10,198, and 6,994. Candidates sent to the background were 167, 167, and 164, close to the baseline. The worker recorded 4, 5, and 3 provider requests, completing in 263–677 ms. All three main-frame queues drained without a reported error.
+
+The subscription rule was enabled. A read-only comparison of the old and new extractors on the same live DOM returned identical results for all 273 candidates. A separate check of the surviving banner also returned identical candidates. That rules out a difference in extracted banner features in that check, but does not establish why classification or hiding missed it. The banner needs separate diagnosis; it must not be treated as successful full-page cleanup.
+
+Validation: formatting, lint, type checking, all 160 tests, and Chrome/Firefox builds passed. Tests cover shared-read invalidation, fresh validation, backlog dispatch, resets, cache handling, and cooldown/retry behavior. The original browser settings were restored, the measurement tab was closed, and the original forum tab was reactivated.
+
+## Baseline
+
+The remaining sections describe the original `3b722a4` measurements and the opportunities identified from them.
 
 ## Method and limits
 
@@ -59,4 +95,4 @@ The existing popup counters need care: `sent` includes candidates served from pe
 
 5. Reduce rescans triggered by presentation writes. [Mutation handling](lib/runtime/page-session.ts) queues mutated targets, or the document for large mutation batches. Distinguish the extension's own expected style writes from new page changes, and avoid scanning hidden subtrees when only their presentation needs validation. The extra inspections after cleanup justify investigating this, but external mutations still need full safety checks.
 
-Start with the repeated checks and backlog delay, then repeat the same foreground measurement before adding more scheduling complexity. No speedup has been measured for these proposed changes.
+Opportunities 1 and 2 are implemented and remeasured above. Opportunities 3–5 remain unimplemented; their performance effects have not been measured.
