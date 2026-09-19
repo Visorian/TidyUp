@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/max-classes-per-file -- Element and CSS rule doubles exercise reversible stylesheet cleanup. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PresentationStore } from '../lib/blocking/hide';
 
@@ -20,6 +21,7 @@ vi.mock('../lib/candidates/regions', () => ({
 
 interface FixtureDocument {
   body: FixtureElement | null;
+  readonly defaultView: null;
   readonly location: { readonly hostname: string };
 }
 
@@ -75,7 +77,11 @@ function fixture(): {
   readonly wrapper: HTMLElement;
   readonly body: HTMLElement;
 } {
-  const document: FixtureDocument = { body: null, location: { hostname: 'news.example.org' } };
+  const document: FixtureDocument = {
+    body: null,
+    defaultView: null,
+    location: { hostname: 'news.example.org' },
+  };
   const body = new FixtureElement(document);
   const wrapper = new FixtureElement(document);
   const ad = new FixtureElement(document);
@@ -179,4 +185,45 @@ it('finds a colored ad mount inside the classified outer wrapper', () => {
   expect(body.style.getPropertyValue('background-color')).toBe('');
   store.restoreAll();
   expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
+});
+
+it('neutralizes an ad-owned page-background variable and restores it when revealing the ad', () => {
+  const { store, ad, wrapper, body } = fixture();
+  body.style.removeProperty('background-color');
+  class BackgroundRule {
+    readonly selectorText = 'body';
+    readonly style = {
+      *[Symbol.iterator]() {
+        yield '--site-background';
+      },
+      getPropertyValue: () => '#024ad8',
+    };
+  }
+  vi.stubGlobal('CSSStyleRule', BackgroundRule);
+  const stylesheet = { parentElement: wrapper, sheet: { cssRules: [new BackgroundRule()] } };
+  Object.defineProperty(wrapper, 'querySelectorAll', { value: () => [stylesheet] });
+  Object.defineProperty(body.ownerDocument, 'defaultView', {
+    value: {
+      getComputedStyle: () => ({
+        backgroundColor: 'rgb(2, 74, 216)',
+        getPropertyValue: () => '#024ad8',
+      }),
+    },
+  });
+  expect(store.apply(ad, 0.99, 0.9, false)).toBe(true);
+  expect(body.style.getPropertyValue('--site-background')).toBe('inherit');
+  expect(body.style.getPropertyPriority('--site-background')).toBe('important');
+  store.queueChanges([wrapper]);
+  expect(store.restoreNext()?.restored).toBe(false);
+  store.restoreAll();
+  expect(body.style.getPropertyValue('--site-background')).toBe('');
+  wrapper.style.setProperty('background-color', 'rgb(10, 10, 10)', 'important');
+  store.apply(ad, 0.99, 0.9, false);
+  expect(body.style.getPropertyValue('--site-background')).toBe('');
+  wrapper.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
+  store.queueChanges([wrapper]);
+  expect(store.restoreNext()?.restored).toBe(false);
+  expect(body.style.getPropertyValue('--site-background')).toBe('inherit');
+  store.restoreAll();
+  expect(body.style.getPropertyValue('--site-background')).toBe('');
 });

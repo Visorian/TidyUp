@@ -3,7 +3,7 @@ import { extractSpecialCandidate, specialPresentationFingerprint } from '../cand
 import { isSafeCandidateBoundary } from '../candidates/visibility';
 import type { AdCandidate } from '../shared/types';
 import { findAdContainer, isAdContainer } from './ad-container';
-import { adBackgroundColorTarget } from './background-color';
+import { adBackgroundColorTarget, adBackgroundVariables } from './background-color';
 
 interface StyleChange {
   readonly element: HTMLElement;
@@ -112,8 +112,11 @@ export class PresentationStore {
     const property = debug ? 'outline' : kind === 'background' ? 'background-image' : 'display';
     const color = probability >= threshold ? '#dc2626' : probability <= 0.1 ? '#16a34a' : '#ca8a04';
     const background = debug ? null : adBackgroundColorTarget(element, target, kind);
+    const variables = debug ? [] : adBackgroundVariables(element, target);
     const changes = [changeStyle(target, property, debug ? `3px solid ${color}` : 'none')];
     if (background !== null) changes.push(changeStyle(background, 'background-color', ''));
+    for (const variable of variables)
+      changes.push(changeStyle(element.ownerDocument.body, variable, 'inherit'));
     this.entries.set(element, {
       element,
       target,
@@ -193,19 +196,39 @@ export class PresentationStore {
     if (element === undefined) return undefined;
     this.pending.delete(element);
     const entry = this.entries.get(element);
+    if (entry === undefined) return { restored: false, root: null, element };
     if (
-      entry === undefined ||
-      (element.isConnected &&
-        (entry.kind !== undefined || safePresentation(element)) &&
-        (entry.target === element || isAdContainer(entry.target, entry.element)) &&
-        fingerprint(element, entry.kind) === entry.fingerprint &&
-        entry.changes.every(
-          (change) =>
-            change.element.style.getPropertyValue(change.property) === change.applied &&
-            change.element.style.getPropertyPriority(change.property) === change.appliedPriority,
-        ))
-    )
+      element.isConnected &&
+      (entry.kind !== undefined || safePresentation(element)) &&
+      (entry.target === element || isAdContainer(entry.target, entry.element)) &&
+      fingerprint(element, entry.kind) === entry.fingerprint &&
+      entry.changes.every(
+        (change) =>
+          change.element.style.getPropertyValue(change.property) === change.applied &&
+          change.element.style.getPropertyPriority(change.property) === change.appliedPriority,
+      )
+    ) {
+      if (!entry.debug) {
+        const variables = adBackgroundVariables(entry.element, entry.target).filter(
+          (variable) =>
+            !entry.changes.some(
+              (change) =>
+                change.element === element.ownerDocument.body && change.property === variable,
+            ),
+        );
+        if (variables.length > 0)
+          this.entries.set(element, {
+            ...entry,
+            changes: [
+              ...entry.changes,
+              ...variables.map((variable) =>
+                changeStyle(element.ownerDocument.body, variable, 'inherit'),
+              ),
+            ],
+          });
+      }
       return { restored: false, root: null, element };
+    }
     const root = entry.target.isConnected ? entry.target : element.isConnected ? element : null;
     return {
       element,
