@@ -131,6 +131,41 @@ it('stops promotion at real sibling text while collapsing an inner ad-only hull'
   expect(findAdContainer(ad)).toBe(hull);
 });
 
+it('collapses an ad placement containing a hidden zero-sized blank measurement frame', () => {
+  const ad = advertisement();
+  const measurement = createNode('iframe');
+  measurement.setAttribute('width', '0');
+  measurement.setAttribute('height', '0');
+  measurement.setAttribute('src', 'about:blank');
+  measurement.setAttribute('display', 'none');
+  const wrapper = createNode(
+    'div',
+    createNode('div', ad, measurement),
+    createNode('span', 'Anzeige'),
+  );
+  expect(findAdContainer(ad)).toBe(wrapper);
+  measurement.setAttribute('display', 'block');
+  expect(isAdContainer(wrapper, ad)).toBe(false);
+});
+
+it.each([
+  ['width', '300'],
+  ['height', '250'],
+  ['src', 'https://example.com/widget'],
+  ['srcdoc', '<p>Content</p>'],
+  ['tabindex', '0'],
+])('preserves a sibling frame with %s=%s', (attribute, value) => {
+  const ad = advertisement();
+  const frame = createNode('iframe');
+  frame.setAttribute('width', '0');
+  frame.setAttribute('height', '0');
+  frame.setAttribute('src', 'about:blank');
+  frame.setAttribute('display', 'none');
+  frame.setAttribute(attribute, value);
+  createNode('div', ad, frame);
+  expect(findAdContainer(ad)).toBe(ad);
+});
+
 it.each(['background', 'background::before', 'background::after'])(
   'preserves sibling background artwork in %s',
   (attribute) => {

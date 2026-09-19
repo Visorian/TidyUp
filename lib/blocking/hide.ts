@@ -227,6 +227,10 @@ export function watchPresentation(
     attributeFilter: [
       'href',
       'src',
+      'srcdoc',
+      'width',
+      'height',
+      'tabindex',
       'class',
       'id',
       'title',

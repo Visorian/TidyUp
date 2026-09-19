@@ -49,12 +49,25 @@ function hasOnlyAdSurroundings(container: HTMLElement, element: HTMLElement): bo
     if (node.nodeType === Node.COMMENT_NODE) continue;
     if (!(node instanceof HTMLElement)) return false;
     if (node.matches(INERT_ELEMENTS)) continue;
+    if (isMeasurementFrame(node)) continue;
     if (!node.matches(EMPTY_ELEMENTS) || node.matches(INTERACTIVE) || !safeDecoration(node))
       return false;
     if (pending.length + node.childNodes.length > 80) return false;
     pending.push(...node.childNodes);
   }
   return pending.length === 0;
+}
+
+function isMeasurementFrame(element: HTMLElement): boolean {
+  return (
+    element.matches('iframe') &&
+    element.getAttribute('width') === '0' &&
+    element.getAttribute('height') === '0' &&
+    element.getAttribute('src') === 'about:blank' &&
+    element.getAttribute('srcdoc') === null &&
+    !element.matches(INTERACTIVE) &&
+    element.ownerDocument.defaultView?.getComputedStyle(element).display === 'none'
+  );
 }
 
 function safeDecoration(element: HTMLElement): boolean {
