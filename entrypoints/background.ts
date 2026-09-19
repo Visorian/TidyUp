@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { clearDecisionCache } from '../lib/classifier/cache';
-import { runClassification } from '../lib/classifier/service';
+import { runClassification, runCacheLookup } from '../lib/classifier/service';
+import { clearReplayCache, getReplayEntries, rememberReplay } from '../lib/classifier/replay-cache';
 import { parseCandidates } from '../lib/classifier/validate';
 import { publicSettings, readSettings, restrictStorage } from '../lib/config/settings';
 import { isPublicHost, isRecord, isSiteEnabled, parseSettings } from '../lib/shared/validation';
@@ -55,7 +56,10 @@ async function handle(message: unknown, sender: Sender): Promise<unknown> {
     return { ok: false, error: 'Invalid extension request.' };
   await restrictStorage();
   if (message['type'] === 'GET_SETTINGS') return publicSettings();
-  if (message['type'] === 'CLASSIFY') return handlePage(message, sender);
+  if (
+    ['CLASSIFY', 'LOOKUP_CACHE', 'GET_REPLAY', 'REMEMBER_REGION'].includes(String(message['type']))
+  )
+    return handlePage(message, sender);
   if (!isControl(sender))
     return { ok: false, error: 'Open the extension controls to change settings.' };
   if (message['type'] === 'SAVE_SETTINGS')
@@ -67,6 +71,7 @@ async function handle(message: unknown, sender: Sender): Promise<unknown> {
     if (host !== undefined && (typeof host !== 'string' || !isPublicHost(host)))
       return { ok: false, error: 'Choose a public website.' };
     await clearDecisionCache(host);
+    await clearReplayCache(host);
     await notifySettings();
     return publicSettings();
   }
@@ -111,6 +116,9 @@ function onMessage(
     ![
       'GET_SETTINGS',
       'CLASSIFY',
+      'LOOKUP_CACHE',
+      'GET_REPLAY',
+      'REMEMBER_REGION',
       'SAVE_SETTINGS',
       'SET_SITE',
       'SET_SITE_CACHE',
@@ -160,7 +168,28 @@ async function handlePage(
     return { ok: false, error: 'Semantic blocking is disabled for this site.' };
   }
   const candidates = parseCandidates(message['candidates'], host);
+  if (message['type'] === 'GET_REPLAY')
+    return { ok: true, settings, snapshot: await getReplayEntries(sender.url, settings) };
+  if (message['type'] === 'REMEMBER_REGION') {
+    const selector = message['selector'];
+    const epoch = message['epoch'];
+    const candidate = candidates?.length === 1 ? candidates[0] : undefined;
+    if (
+      candidate === undefined ||
+      typeof selector !== 'string' ||
+      selector.length > 1000 ||
+      typeof epoch !== 'string'
+    )
+      return { ok: false, error: 'Invalid remembered region.' };
+    const cached = await runCacheLookup([candidate], host);
+    const result = cached.ok ? cached.results[0] : undefined;
+    if (result !== undefined)
+      await rememberReplay(sender.url, settings, selector, candidate, result, epoch);
+    return { ok: true };
+  }
   return candidates === null
     ? { ok: false, error: 'Invalid candidate payload.' }
-    : runClassification(candidates, host);
+    : message['type'] === 'LOOKUP_CACHE'
+      ? runCacheLookup(candidates, host)
+      : runClassification(candidates, host);
 }

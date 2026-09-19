@@ -1,7 +1,12 @@
 import { browser } from 'wxt/browser';
 import { activeRules } from '../config/categories';
 import { candidateFingerprint } from '../candidates/fingerprint';
-import type { AdCandidate, ClassificationResponse, Settings } from '../shared/types';
+import type {
+  AdCandidate,
+  CandidateClassification,
+  ClassificationResponse,
+  Settings,
+} from '../shared/types';
 import { isCacheEnabled, isRecord, parseRuleProbabilities } from '../shared/validation';
 import { PROVIDERS } from './client';
 import { POLICY_VERSION } from './policy';
@@ -100,6 +105,32 @@ export async function clearDecisionCache(host?: string): Promise<void> {
         epoch: crypto.randomUUID(),
         entries: site === undefined ? [] : cache.entries.filter((entry) => entry.site !== site),
       },
+    });
+  });
+}
+
+export async function lookupDecisionCache(
+  candidates: readonly AdCandidate[],
+  settings: Settings,
+  host: string,
+): Promise<readonly CandidateClassification[]> {
+  if (!isCacheEnabled(settings, host)) return [];
+  const items = await lookups(candidates, settings);
+  return navigator.locks.request('tidyup-cache', async () => {
+    const snapshot = await readCache();
+    const ruleCount = activeRules(settings).length;
+    const entries = new Map(snapshot.entries.map((entry) => [entry.hash, entry]));
+    return items.flatMap(({ candidate, hash: fingerprint }) => {
+      const entry = entries.get(fingerprint);
+      return entry === undefined || entry.ruleProbabilities.length !== ruleCount
+        ? []
+        : [
+            {
+              id: candidate.id,
+              probability: entry.probability,
+              ruleProbabilities: entry.ruleProbabilities,
+            },
+          ];
     });
   });
 }

@@ -11,6 +11,8 @@ import { parsePublicSettings, receivePageMessage, send } from './messages';
 import { IdleScheduler, createPageActivation } from './scheduler';
 import { MutationRoots, observeMutations } from './mutation-queue';
 import { ClassificationQueue, type PendingCandidate } from './classification-queue';
+import { CacheFirst } from './cache-first';
+import { ReplayRegions } from './replay-regions';
 
 interface HiddenDecision {
   readonly pending: PendingCandidate;
@@ -64,6 +66,41 @@ export class PageSession {
     },
     generation: () => this.generation,
     checkNavigation: () => this.checkNavigation(),
+  });
+  private readonly cacheFirst = new CacheFirst({
+    enabled: () =>
+      this.configuration !== null && isCacheEnabled(this.configuration.settings, location.hostname),
+    current: (pending) => this.current(pending),
+    hit: (pending, result) => {
+      this.queue.metrics.cacheHits++;
+      this.apply(pending, result);
+    },
+    miss: (pending) => {
+      if (this.queue.full || this.queue.suspended) return false;
+      this.queue.add(pending);
+      this.queue.schedule();
+      return true;
+    },
+    wake: () => {
+      this.schedule(0);
+    },
+  });
+  private readonly replay = new ReplayRegions({
+    active: () => this.allowed() && this.activation.active && this.href === location.href,
+    hidden: (element) => this.presentations.has(element),
+    apply: (element, candidate, result) => {
+      this.queue.metrics.cacheHits++;
+      this.apply(
+        {
+          element,
+          candidate,
+          fingerprint: candidateFingerprint(candidate),
+          generation: this.generation,
+        },
+        result,
+        false,
+      );
+    },
   });
   start(): void {
     browser.runtime.onMessage.addListener(this.onMessage);
@@ -137,7 +174,7 @@ export class PageSession {
       metrics: {
         ...this.metrics,
         ...this.queue.metrics,
-        queued: this.queue.size,
+        queued: this.queue.size + this.cacheFirst.size,
       },
     };
   }
@@ -171,6 +208,8 @@ export class PageSession {
   private begin(): void {
     if (!this.allowed() || !this.activation.active) return;
     observeMutations(this.observer, document);
+    if (this.configuration !== null)
+      void this.replay.start(this.configuration.settings, this.generation).catch(() => {});
     this.addRoot(document);
     this.schedule(300);
   }
@@ -185,6 +224,8 @@ export class PageSession {
     this.revealedDecisions = [];
     this.roots.clear();
     this.queue.reset();
+    this.cacheFirst.reset();
+    this.replay.stop();
     this.walker = null;
     this.error = '';
   }
@@ -225,10 +266,11 @@ export class PageSession {
     if (!this.roots.add(root)) this.queue.metrics.dropped++;
   }
   private schedule(delay: number): void {
-    if (this.runnable(this.presentations.hasPending)) this.scheduler.schedule(delay);
+    if (this.runnable(true)) this.scheduler.schedule(delay);
   }
   private process(): void {
     if (!this.runnable(true) || this.checkNavigation()) return;
+    this.cacheFirst.drainMisses();
     const started = performance.now();
     let visited = 0;
     const reads = new CandidateReadCache();
@@ -241,7 +283,7 @@ export class PageSession {
         visited++;
         continue;
       }
-      if (!this.runnable() || this.queue.full) break;
+      if (!this.runnable(true) || this.cacheFirst.full) break;
       if (this.walker === null) {
         const root = this.roots.take();
         if (root === undefined) break;
@@ -259,7 +301,7 @@ export class PageSession {
     this.queue.schedule();
     if (
       this.presentations.hasPending ||
-      (!this.queue.full && (this.walker !== null || this.roots.size > 0)) ||
+      (!this.cacheFirst.full && (this.walker !== null || this.roots.size > 0)) ||
       this.queue.hasDecisions ||
       this.revealedDecisions.length > 0
     )
@@ -282,6 +324,8 @@ export class PageSession {
     if (change.root !== null) {
       this.queue.forget(change.element);
       this.queue.forget(change.root);
+      this.cacheFirst.forget(change.element);
+      this.cacheFirst.forget(change.root);
       this.addRoot(change.root);
     }
     return true;
@@ -301,12 +345,13 @@ export class PageSession {
     );
     if (candidate === null) return;
     const fingerprint = candidateFingerprint(candidate);
-    if (this.queue.add({ element, candidate, fingerprint, generation: this.generation }))
+    if (this.cacheFirst.add({ element, candidate, fingerprint, generation: this.generation }))
       this.metrics.candidates++;
   }
   private current(pending: Readonly<PendingCandidate>): boolean {
     if (
-      !this.runnable() ||
+      !this.allowed() ||
+      !this.activation.active ||
       this.href !== location.href ||
       pending.generation !== this.generation ||
       !pending.element.isConnected ||
@@ -316,11 +361,16 @@ export class PageSession {
     const current = extractCandidate(pending.element, pending.candidate.id, location.hostname);
     return current !== null && candidateFingerprint(current) === pending.fingerprint;
   }
-  private apply(pending: Readonly<PendingCandidate>, result: CandidateClassification): void {
+  private apply(
+    pending: Readonly<PendingCandidate>,
+    result: CandidateClassification,
+    remember = true,
+  ): void {
     if (!this.current(pending) || this.configuration === null) return;
     const { threshold, debug } = this.configuration.settings;
     const { element, candidate } = pending;
     if (this.presentations.apply(element, result.probability, threshold, debug, candidate.kind)) {
+      if (remember) this.replay.remember(element, candidate, this.generation);
       this.metrics.hidden++;
       this.hiddenDecisions.set(element, {
         pending,

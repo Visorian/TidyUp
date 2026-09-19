@@ -4,30 +4,35 @@ import { LIMITS } from '../config/defaults';
 import { readKey, readSettings } from '../config/settings';
 import type { AdCandidate, ClassificationResponse, Settings } from '../shared/types';
 import { isRecord, isSiteEnabled } from '../shared/validation';
-import { withDecisionCache } from './cache';
+import { lookupDecisionCache, withDecisionCache } from './cache';
 import { classify, ServiceError } from './client';
 
 // Only queue occupancy is transient. The request lease and cooldown survive background restarts.
 let pendingRequests = 0;
 
-export async function runClassification(
+export function runClassification(
   candidates: readonly AdCandidate[],
   pageHost?: string,
 ): Promise<ClassificationResponse> {
-  if (pendingRequests >= 2)
-    return {
-      ok: false,
-      error: 'The evaluation queue is temporarily full.',
-      retryAfterMs: LIMITS.timeoutMs + 1000,
-    };
-  pendingRequests++;
-  try {
-    return await navigator.locks.request('tidyup-classification', () =>
-      evaluateCandidates(candidates, pageHost),
-    );
-  } finally {
-    pendingRequests--;
-  }
+  return evaluateCandidates(candidates, pageHost);
+}
+
+export async function runCacheLookup(
+  candidates: readonly AdCandidate[],
+  pageHost: string,
+): Promise<ClassificationResponse> {
+  const settings = await readSettings();
+  if (!isSiteEnabled(settings, pageHost))
+    return { ok: false, error: 'Blocking is disabled for this site.' };
+  if (activeRules(settings).length === 0) return { ok: true, results: [] };
+  const key = await readKey(settings.provider);
+  const results = await lookupDecisionCache(candidates, settings, pageHost);
+  if (
+    JSON.stringify(await readSettings()) !== JSON.stringify(settings) ||
+    (await readKey(settings.provider)) !== key
+  )
+    return { ok: false, error: 'Settings changed during evaluation. Content remains visible.' };
+  return { ok: true, results };
 }
 
 async function evaluateCandidates(
@@ -40,11 +45,9 @@ async function evaluateCandidates(
   const enabledRules = activeRules(settings).map((rule) => rule.text);
   if (pageHost !== undefined && enabledRules.length === 0) return { ok: true, results: [] };
   const key = await readKey(settings.provider);
-  if (key.length === 0)
-    return { ok: false, error: 'Add a key for the selected provider in settings.' };
   const rules = pageHost === undefined ? ['The region contains the word Sponsored.'] : enabledRules;
   const evaluate = (batch: readonly AdCandidate[]): Promise<ClassificationResponse> =>
-    prepareRequest(batch, settings, key, rules);
+    queueRequest(batch, settings, key, rules);
   const response =
     pageHost === undefined
       ? await evaluate(candidates)
@@ -55,6 +58,35 @@ async function evaluateCandidates(
   )
     return { ok: false, error: 'Settings changed during evaluation. Content remains visible.' };
   return response;
+}
+
+async function queueRequest(
+  candidates: readonly AdCandidate[],
+  settings: Settings,
+  key: string,
+  rules: readonly string[],
+): Promise<ClassificationResponse> {
+  if (key.length === 0)
+    return { ok: false, error: 'Add a key for the selected provider in settings.' };
+  if (pendingRequests >= 2)
+    return {
+      ok: false,
+      error: 'The evaluation queue is temporarily full.',
+      retryAfterMs: LIMITS.timeoutMs + 1000,
+    };
+  pendingRequests++;
+  try {
+    return await navigator.locks.request('tidyup-classification', async () => {
+      if (
+        JSON.stringify(await readSettings()) !== JSON.stringify(settings) ||
+        (await readKey(settings.provider)) !== key
+      )
+        return { ok: false, error: 'Settings changed during evaluation. Content remains visible.' };
+      return prepareRequest(candidates, settings, key, rules);
+    });
+  } finally {
+    pendingRequests--;
+  }
 }
 
 async function prepareRequest(

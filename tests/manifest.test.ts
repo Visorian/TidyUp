@@ -15,7 +15,7 @@ it.each([
   expect(manifest).toMatchObject({
     name: 'TidyUp',
     manifest_version: 3,
-    content_scripts: [expect.objectContaining({ run_at: 'document_idle' })],
+    content_scripts: [expect.objectContaining({ run_at: 'document_start' })],
   });
   expect(manifest).not.toHaveProperty('declarative_net_request');
   expect(manifest).not.toHaveProperty('options_ui');

@@ -4,7 +4,7 @@ import { PageSession } from '../lib/runtime/page-session';
 
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
-  runAt: 'document_idle',
+  runAt: 'document_start',
   allFrames: true,
   main(context: Readonly<Pick<ContentScriptContext, 'onInvalidated'>>) {
     const session = new PageSession();

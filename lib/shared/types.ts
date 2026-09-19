@@ -98,6 +98,21 @@ export type ExtensionMessage =
       readonly generation: number;
       readonly candidates: readonly AdCandidate[];
     }
+  | {
+      readonly type: 'LOOKUP_CACHE';
+      readonly pageHost: string;
+      readonly generation: number;
+      readonly candidates: readonly AdCandidate[];
+    }
+  | { readonly type: 'GET_REPLAY'; readonly pageHost: string; readonly generation: number }
+  | {
+      readonly type: 'REMEMBER_REGION';
+      readonly pageHost: string;
+      readonly generation: number;
+      readonly candidates: readonly AdCandidate[];
+      readonly selector: string;
+      readonly epoch: string;
+    }
   | { readonly type: 'SETTINGS_CHANGED' }
   | { readonly type: 'GET_STATUS' }
   | { readonly type: 'REVEAL' }

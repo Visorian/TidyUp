@@ -145,10 +145,10 @@ beforeEach(() => {
   vi.stubGlobal(
     'MutationObserver',
     class {
-      constructor(callback: typeof mutate) {
-        mutate = callback;
+      constructor(private readonly callback: typeof mutate) {}
+      observe(): void {
+        mutate = this.callback;
       }
-      observe(): void {}
       disconnect(): void {}
     },
   );
@@ -209,7 +209,7 @@ it('resumes the remaining scan when queued candidates all become invalid before 
   session = new PageSession();
   session.start();
   await vi.advanceTimersByTimeAsync(390);
-  expect(status()).toMatchObject({ metrics: { queued: 64 } });
+  expect(status()).toMatchObject({ metrics: { queued: 100 } });
   for (const element of elements.slice(0, 64)) runtime.invalidText.add(element.textContent);
 
   await vi.advanceTimersByTimeAsync(10_000);
@@ -302,6 +302,8 @@ function respondToMessage(message: ExtensionMessage): Promise<unknown> {
       configured: true,
       settings,
     });
+  if (message.type === 'LOOKUP_CACHE') return Promise.resolve({ ok: true, results: [] });
+  if (message.type === 'GET_REPLAY') return Promise.resolve({ ok: true, snapshot: null });
   if (message.type !== 'CLASSIFY') throw new Error('Unexpected message');
   classified.push(...message.candidates.map((candidate) => candidate.text));
   return new Promise((resolve) => {
@@ -444,3 +446,65 @@ it('does not replay detached regions or reuse revealed decisions for an explicit
   await vi.advanceTimersByTimeAsync(3000);
   expect(classified).toHaveLength(2);
 });
+
+it('hides a newly inserted cached region before an earlier provider request completes', async () => {
+  runtime.applied.mockReturnValue(true);
+  runtime.sendMessage.mockImplementation(respondWithCachedAdvertisement);
+  appendCandidates(1, 'Uncached advertisement');
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(900);
+  expect(classified).toEqual(['Uncached advertisement 0']);
+  expect(runtime.applied).not.toHaveBeenCalled();
+  const cached = requireElement(appendCandidates(1, 'Cached advertisement')[0]);
+  mutate([{ target: document }]);
+  await vi.advanceTimersByTimeAsync(300);
+  expect(runtime.applied).toHaveBeenCalledExactlyOnceWith(cached);
+  expect(classified).toEqual(['Uncached advertisement 0']);
+  expect(status()).toMatchObject({ metrics: { hidden: 1, cacheHits: 1 } });
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(runtime.applied).toHaveBeenCalledTimes(2);
+  expect(classified).toEqual(['Uncached advertisement 0']);
+});
+
+function respondWithCachedAdvertisement(message: ExtensionMessage): Promise<unknown> {
+  if (message.type === 'LOOKUP_CACHE')
+    return Promise.resolve({
+      ok: true,
+      results: message.candidates
+        .filter((candidate) => candidate.text.startsWith('Cached advertisement'))
+        .map(({ id }) => ({ id, probability: 0.99, ruleProbabilities: [0.99] })),
+    });
+  return respondToMessage(message);
+}
+
+it('continues discovering and hiding cache hits after a provider failure while leaving misses paused', async () => {
+  runtime.applied.mockReturnValue(true);
+  runtime.sendMessage.mockImplementation(respondWithFailedProvider);
+  appendCandidates(1, 'Uncached advertisement');
+  session = new PageSession();
+  session.start();
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(classified).toEqual(['Uncached advertisement 0']);
+  expect(status()).toMatchObject({ error: 'Provider unavailable', metrics: { hidden: 0 } });
+  const cached = requireElement(appendCandidates(1, 'Cached advertisement')[0]);
+  appendCandidates(1, 'Later uncached advertisement');
+  mutate([{ target: document }]);
+  await vi.advanceTimersByTimeAsync(300);
+  expect(runtime.applied).toHaveBeenCalledExactlyOnceWith(cached);
+  expect(status()).toMatchObject({
+    error: 'Provider unavailable',
+    metrics: { hidden: 1, cacheHits: 1, queued: 1 },
+  });
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(classified).toEqual(['Uncached advertisement 0']);
+  expect(runtime.applied).toHaveBeenCalledOnce();
+});
+
+function respondWithFailedProvider(message: ExtensionMessage): Promise<unknown> {
+  if (message.type === 'CLASSIFY') {
+    classified.push(...message.candidates.map((candidate) => candidate.text));
+    return Promise.resolve({ ok: false, error: 'Provider unavailable' });
+  }
+  return respondWithCachedAdvertisement(message);
+}
