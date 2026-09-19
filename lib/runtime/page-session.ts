@@ -1,16 +1,18 @@
+/* oxlint-disable import/max-dependencies -- Category attribution belongs to the existing page presentation lifecycle. */
 import { browser } from 'wxt/browser';
 import { PresentationStore, watchPresentation } from '../blocking/hide';
 import { enumerateElements, extractCandidate } from '../candidates/extract';
 import { candidateFingerprint } from '../candidates/fingerprint';
-import type { PageStatus, PublicSettings } from '../shared/types';
+import { activeRules, matchingCategoryIds, countHiddenCategories } from '../config/categories';
+import type { CandidateClassification, PageStatus, PublicSettings } from '../shared/types';
 import { isCacheEnabled, isSiteEnabled } from '../shared/validation';
 import { parsePublicSettings, receivePageMessage, send } from './messages';
 import { IdleScheduler, createPageActivation } from './scheduler';
 import { MutationRoots, observeMutations } from './mutation-queue';
-import { ClassificationQueue } from './classification-queue';
-import type { PendingCandidate } from './classification-queue';
+import { ClassificationQueue, type PendingCandidate } from './classification-queue';
 
 export class PageSession {
+  private readonly hiddenCategories = new Map<Element, readonly string[]>();
   private configuration: PublicSettings | null = null;
   private readonly presentations = new PresentationStore();
   private readonly roots = new MutationRoots();
@@ -33,21 +35,17 @@ export class PageSession {
   private readonly observer = new MutationObserver((records: readonly MutationRecord[]) => {
     this.mutations(records);
   });
-  private readonly metrics = {
-    scanned: 0,
-    candidates: 0,
-    hidden: 0,
-    restored: 0,
-  };
+  private readonly metrics = { scanned: 0, candidates: 0, hidden: 0, restored: 0 };
   private readonly queue = new ClassificationQueue({
     runnable: () => this.runnable(),
     cacheEnabled: () =>
       this.configuration !== null && isCacheEnabled(this.configuration.settings, location.hostname),
-    ruleCount: () => this.configuration?.settings.rules.length ?? 0,
+    ruleCount: () =>
+      this.configuration === null ? 0 : activeRules(this.configuration.settings).length,
     settings: () => this.configuration?.settings ?? null,
     current: (pending) => this.current(pending),
-    apply: (pending, probability) => {
-      this.apply(pending, probability);
+    apply: (pending, result) => {
+      this.apply(pending, result);
     },
     wake: () => {
       this.error = '';
@@ -116,6 +114,7 @@ export class PageSession {
       paused: this.activation.paused,
       waitingForActivation: this.allowed() && this.activation.waiting,
       error: this.error,
+      hiddenByCategory: countHiddenCategories([...this.hiddenCategories.values()]),
       metrics: {
         ...this.metrics,
         ...this.queue.metrics,
@@ -128,7 +127,7 @@ export class PageSession {
       !this.stopped &&
       this.configuration !== null &&
       this.configuration.configured &&
-      this.configuration.settings.rules.length > 0 &&
+      activeRules(this.configuration.settings).length > 0 &&
       isSiteEnabled(this.configuration.settings, location.hostname)
     );
   }
@@ -163,6 +162,7 @@ export class PageSession {
     this.observedShadows = new WeakSet();
     this.metrics.restored += this.presentations.restoreAll();
     this.metrics.hidden = 0;
+    this.hiddenCategories.clear();
     this.roots.clear();
     this.queue.reset();
     this.walker = null;
@@ -244,6 +244,7 @@ export class PageSession {
     const change = this.presentations.restoreNext();
     if (change === undefined) return false;
     if (change.restored) {
+      this.hiddenCategories.delete(change.element);
       this.metrics.restored++;
       this.metrics.hidden = Math.max(0, this.metrics.hidden - 1);
     }
@@ -278,12 +279,14 @@ export class PageSession {
     const current = extractCandidate(pending.element, pending.candidate.id, location.hostname);
     return current !== null && candidateFingerprint(current) === pending.fingerprint;
   }
-  private apply(pending: Readonly<PendingCandidate>, probability: number): void {
+  private apply(pending: Readonly<PendingCandidate>, result: CandidateClassification): void {
     if (!this.current(pending) || this.configuration === null) return;
     const { threshold, debug } = this.configuration.settings;
     const { element, candidate } = pending;
-    if (this.presentations.apply(element, probability, threshold, debug, candidate.kind))
+    if (this.presentations.apply(element, result.probability, threshold, debug, candidate.kind)) {
       this.metrics.hidden++;
+      this.hiddenCategories.set(element, matchingCategoryIds(this.configuration.settings, result));
+    }
     if (this.presentations.has(element)) watchPresentation(this.observer, element);
   }
   private fail(message: string): void {

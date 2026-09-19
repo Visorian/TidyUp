@@ -51,7 +51,7 @@ function render(): void {
   threshold.value = String(current.settings.threshold * 100);
   debug.checked = current.settings.debug;
   cache.checked = current.settings.cacheEnabled;
-  setRules(current.settings.rules);
+  setRules(current.settings);
   sites.value = current.settings.disabledSites.join('\n');
   key.value = '';
   showKeyStatus();
@@ -65,7 +65,7 @@ function readSettings(): Settings {
     model: model.value,
     threshold: threshold.valueAsNumber / 100,
     debug: debug.checked,
-    rules: readRules(),
+    ...readRules(),
     cacheEnabled: cache.checked,
     cacheDisabledSites: current?.settings.cacheDisabledSites ?? [],
     disabledSites: sites.value

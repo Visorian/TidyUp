@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: Settings = {
   threshold: 0.9,
   debug: false,
   rules: [],
+  categories: [],
   cacheEnabled: true,
   cacheDisabledSites: [],
 };

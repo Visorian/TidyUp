@@ -48,8 +48,8 @@ it.each([
     ),
   );
   await expect(classify(provider, 'test-key', candidates, rules, 'jev')).resolves.toEqual([
-    { id: 'card_1', probability: 0.999 },
-    { id: 'card_2', probability: 0.94 },
+    { id: 'card_1', probability: 0.999, ruleProbabilities: [0.999, 0.1] },
+    { id: 'card_2', probability: 0.94, ruleProbabilities: [0.01, 0.94] },
   ]);
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(fetchMock).toHaveBeenCalledWith(

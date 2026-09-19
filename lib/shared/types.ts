@@ -4,6 +4,13 @@ export type Model = 'jev';
 
 export type Provider = 'typesafe' | 'openrouter';
 
+export interface RuleCategory {
+  readonly id: string;
+  readonly name: string;
+  readonly enabled: boolean;
+  readonly rules: readonly string[];
+}
+
 export interface Settings {
   readonly enabled: boolean;
   readonly activation: ActivationMode;
@@ -13,6 +20,7 @@ export interface Settings {
   readonly threshold: number;
   readonly debug: boolean;
   readonly rules: readonly string[];
+  readonly categories: readonly RuleCategory[];
   readonly cacheEnabled: boolean;
   readonly cacheDisabledSites: readonly string[];
 }
@@ -47,6 +55,7 @@ export interface CandidateDisplay {
 export interface CandidateClassification {
   readonly id: string;
   readonly probability: number;
+  readonly ruleProbabilities: readonly number[];
 }
 
 export interface PageMetrics {
@@ -68,6 +77,7 @@ export interface PageStatus {
   readonly waitingForActivation: boolean;
   readonly error: string;
   readonly metrics: PageMetrics;
+  readonly hiddenByCategory: Readonly<Record<string, number>>;
 }
 
 export type ExtensionMessage =

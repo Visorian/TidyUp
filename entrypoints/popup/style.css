@@ -147,3 +147,35 @@ main {
 .provider-icon[data-provider='typesafe'] svg[data-provider='typesafe'] {
   display: block;
 }
+
+.category-section {
+  padding-top: 20px;
+}
+.category-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.category-heading h2 {
+  margin-bottom: 4px;
+}
+.category-heading a {
+  font-size: 12px;
+  font-weight: 600;
+}
+.category-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.category-row {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+.category-row strong {
+  overflow-wrap: anywhere;
+}
+#custom-rules {
+  margin-top: 12px;
+}

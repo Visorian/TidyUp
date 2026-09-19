@@ -4,7 +4,7 @@ import type {
   ExtensionMessage,
   PublicSettings,
 } from '../shared/types';
-import { isRecord, parseSettings } from '../shared/validation';
+import { isRecord, parseSettings, parseRuleProbabilities } from '../shared/validation';
 import { browser } from 'wxt/browser';
 
 export async function send(message: ExtensionMessage): Promise<unknown> {
@@ -76,8 +76,11 @@ export function parseClassifications(value: unknown): ClassificationResponse {
     ) {
       return { ok: false, error: 'Invalid classifier response.' };
     }
+    const ruleProbabilities = parseRuleProbabilities(result['ruleProbabilities']);
+    if (ruleProbabilities === null || Math.max(...ruleProbabilities) !== result['probability'])
+      return { ok: false, error: 'Invalid classifier response.' };
     ids.add(result['id']);
-    results.push({ id: result['id'], probability: result['probability'] });
+    results.push({ id: result['id'], probability: result['probability'], ruleProbabilities });
   }
   return { ok: true, results };
 }

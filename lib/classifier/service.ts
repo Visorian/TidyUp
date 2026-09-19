@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { activeRules } from '../config/categories';
 import { LIMITS } from '../config/defaults';
 import { readKey, readSettings } from '../config/settings';
 import type { AdCandidate, ClassificationResponse, Settings } from '../shared/types';
@@ -36,12 +37,12 @@ async function evaluateCandidates(
   const settings = await readSettings();
   if (pageHost !== undefined && !isSiteEnabled(settings, pageHost))
     return { ok: false, error: 'Blocking is disabled for this site.' };
-  if (pageHost !== undefined && settings.rules.length === 0) return { ok: true, results: [] };
+  const enabledRules = activeRules(settings).map((rule) => rule.text);
+  if (pageHost !== undefined && enabledRules.length === 0) return { ok: true, results: [] };
   const key = await readKey(settings.provider);
   if (key.length === 0)
     return { ok: false, error: 'Add a key for the selected provider in settings.' };
-  const rules =
-    pageHost === undefined ? ['The region contains the word Sponsored.'] : settings.rules;
+  const rules = pageHost === undefined ? ['The region contains the word Sponsored.'] : enabledRules;
   const evaluate = (batch: readonly AdCandidate[]): Promise<ClassificationResponse> =>
     prepareRequest(batch, settings, key, rules);
   const response =

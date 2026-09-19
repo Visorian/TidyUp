@@ -1,5 +1,5 @@
 import { LIMITS } from '../config/defaults';
-import type { Settings } from './types';
+import type { RuleCategory, Settings } from './types';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -23,6 +23,7 @@ export function parseSettings(value: unknown): Settings | null {
   const disabledSites = parseSites(value['disabledSites']);
   const cacheDisabledSites = parseSites(value['cacheDisabledSites']);
   const rules = parseRules(value['rules']);
+  const categories = parseCategories(value['categories']);
   const cacheEnabled = value['cacheEnabled'] === undefined ? true : value['cacheEnabled'];
   if (
     typeof value['enabled'] !== 'boolean' ||
@@ -37,6 +38,9 @@ export function parseSettings(value: unknown): Settings | null {
     disabledSites === null ||
     cacheDisabledSites === null ||
     rules === null ||
+    categories === null ||
+    rules.length + categories.reduce((count, category) => count + category.rules.length, 0) >
+      LIMITS.rules ||
     typeof cacheEnabled !== 'boolean'
   ) {
     return null;
@@ -51,6 +55,7 @@ export function parseSettings(value: unknown): Settings | null {
     disabledSites,
     cacheDisabledSites,
     rules,
+    categories,
     cacheEnabled,
   };
 }
@@ -84,4 +89,54 @@ function parseRules(value: unknown): readonly string[] | null {
 
 export function isCacheEnabled(settings: Settings, host: string): boolean {
   return settings.cacheEnabled && !settings.cacheDisabledSites.includes(host);
+}
+
+export function isCategoryId(value: string): boolean {
+  return /^[a-z0-9][a-z0-9-]{0,63}$/u.test(value);
+}
+
+function parseCategories(value: unknown): readonly RuleCategory[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > LIMITS.rules) return null;
+  const categories: RuleCategory[] = [];
+  const ids = new Set<string>();
+  for (const category of value) {
+    if (
+      !isRecord(category) ||
+      typeof category['id'] !== 'string' ||
+      !isCategoryId(category['id']) ||
+      ids.has(category['id']) ||
+      typeof category['name'] !== 'string' ||
+      category['name'].trim().length === 0 ||
+      category['name'].trim().length > 60 ||
+      typeof category['enabled'] !== 'boolean'
+    )
+      return null;
+    const rules = parseRules(category['rules']);
+    if (rules === null) return null;
+    ids.add(category['id']);
+    categories.push({
+      id: category['id'],
+      name: category['name'].trim(),
+      enabled: category['enabled'],
+      rules,
+    });
+  }
+  return categories;
+}
+
+export function parseRuleProbabilities(value: unknown): readonly number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > LIMITS.rules) return null;
+  const probabilities: number[] = [];
+  for (const probability of value) {
+    if (
+      typeof probability !== 'number' ||
+      !Number.isFinite(probability) ||
+      probability < 0 ||
+      probability > 1
+    )
+      return null;
+    probabilities.push(probability);
+  }
+  return probabilities;
 }

@@ -167,7 +167,9 @@ export class PresentationStore {
     }
   }
 
-  restoreNext(): { readonly restored: boolean; readonly root: Element | null } | undefined {
+  restoreNext():
+    | { readonly restored: boolean; readonly root: Element | null; readonly element: Element }
+    | undefined {
     const element = this.pending.values().next().value;
     if (element === undefined) return undefined;
     this.pending.delete(element);
@@ -183,8 +185,9 @@ export class PresentationStore {
             change.element.style.getPropertyPriority(change.property) === 'important',
         ))
     )
-      return { restored: false, root: null };
+      return { restored: false, root: null, element };
     return {
+      element,
       restored: this.restore(element),
       root: element.isConnected ? element : null,
     };

@@ -101,40 +101,74 @@ label:not(.switch-row) {
   border-radius: 8px;
   margin: 0 0 20px;
 }
-#rules {
+h3 {
+  font-size: 15px;
+  margin: 20px 0 4px;
+}
+.rule-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 22px;
+  margin: 0 0 18px;
 }
-#rules:empty {
+.rule-list:empty {
   display: none;
 }
-#rules li {
-  padding: 13px 0;
+.rule-list li {
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
-#rules li:first-child {
-  padding-top: 0;
-}
-#rules span {
+.rule-list textarea {
   display: block;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  margin-top: 7px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-weight: 400;
 }
-#rules button {
-  color: var(--muted);
+.rule-list .text-button {
   font-size: 12px;
-  margin-top: 5px;
-  min-height: 28px;
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
 }
-#rules button:hover {
-  color: var(--error);
-  text-decoration: underline;
+.category-editor {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+.category-editor summary {
+  padding: 13px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.category-editor summary strong {
+  font-size: 14px;
+}
+.category-editor summary span {
+  display: block;
+  margin: 3px 0 0 17px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.category-content {
+  padding: 0 13px 13px;
+}
+.category-content input:not([type='checkbox']) {
+  margin-top: 7px;
+}
+.category-content .category-enabled {
+  padding: 12px 0;
+  font-size: 13px;
+}
+.category-content .rule-actions {
+  flex-wrap: wrap;
+}
+.category-create {
+  display: flex;
+  gap: 8px;
+}
+.category-create input {
+  min-width: 0;
+}
+.new-category {
+  margin: 18px 0;
 }
 .rule-actions {
   display: flex;

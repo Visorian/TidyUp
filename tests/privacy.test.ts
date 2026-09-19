@@ -78,6 +78,7 @@ it('defaults missing exclusions to empty without resetting the saved provider or
     activation: 'automatic',
     disabledSites: [],
     rules: [],
+    categories: [],
     cacheEnabled: true,
     cacheDisabledSites: [],
   });

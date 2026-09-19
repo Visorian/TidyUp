@@ -75,15 +75,12 @@ export function parseAnswers(
   if (!isRecord(value) || !isRecord(value['answers']))
     throw new ServiceError('The service returned an invalid decision response.');
   const answers = value['answers'];
-  return candidates.map(({ id }, candidateIndex) => ({
-    id,
-    probability: Math.max(
-      0,
-      ...rules.map((_rule, ruleIndex) =>
-        readProbability(answers[questionId(candidateIndex, ruleIndex)]),
-      ),
-    ),
-  }));
+  return candidates.map(({ id }, candidateIndex) => {
+    const ruleProbabilities = rules.map((_rule, ruleIndex) =>
+      readProbability(answers[questionId(candidateIndex, ruleIndex)]),
+    );
+    return { id, probability: Math.max(0, ...ruleProbabilities), ruleProbabilities };
+  });
 }
 
 export async function classify(

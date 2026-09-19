@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 
 import type { ExtensionMessage, PageStatus, PublicSettings } from '../shared/types';
-import { isRecord, parseSettings } from '../shared/validation';
+import { isRecord, parseSettings, isCategoryId } from '../shared/validation';
 
 export function element<T extends Element>(selector: string, constructor: { new (): T }): T {
   const match = document.querySelector(selector);
@@ -39,7 +39,8 @@ export async function pageStatus(tabId: number): Promise<PageStatus> {
     typeof response['paused'] !== 'boolean' ||
     typeof response['waitingForActivation'] !== 'boolean' ||
     typeof response['error'] !== 'string' ||
-    !isRecord(response['metrics'])
+    !isRecord(response['metrics']) ||
+    !isRecord(response['hiddenByCategory'])
   ) {
     throw new Error('Page status is unavailable. Reload this tab and try again.');
   }
@@ -56,6 +57,7 @@ export async function pageStatus(tabId: number): Promise<PageStatus> {
     paused: response['paused'],
     waitingForActivation: response['waitingForActivation'],
     error: response['error'],
+    hiddenByCategory: parseCategoryCounts(response['hiddenByCategory']),
     metrics: {
       scanned: count('scanned'),
       candidates: count('candidates'),
@@ -68,4 +70,18 @@ export async function pageStatus(tabId: number): Promise<PageStatus> {
       latencyMs: count('latencyMs'),
     },
   };
+}
+
+function parseCategoryCounts(
+  value: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, number>> {
+  const entries = Object.entries(value);
+  if (entries.length > 20) throw new Error('The page returned invalid category statistics.');
+  const counts = new Map<string, number>();
+  for (const [id, count] of entries) {
+    if (!isCategoryId(id) || typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)
+      throw new Error('The page returned invalid category statistics.');
+    counts.set(id, count);
+  }
+  return Object.fromEntries(counts);
 }

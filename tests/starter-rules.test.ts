@@ -1,28 +1,47 @@
+import assert from 'node:assert/strict';
 import { expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, LIMITS } from '../lib/config/defaults';
-import { addStarterRules, STARTER_RULES } from '../lib/config/starter-rules';
+import { addStarterCategories, STARTER_CATEGORIES } from '../lib/config/starter-rules';
 import { parseSettings } from '../lib/shared/validation';
 
-it('keeps defaults empty and creates valid settings when starter rules are selected', () => {
-  const rules = addStarterRules(DEFAULT_SETTINGS.rules);
+it('keeps fresh defaults empty and adds editable starter categories on request', () => {
   expect(DEFAULT_SETTINGS.rules).toEqual([]);
-  expect(rules).toEqual(STARTER_RULES);
-  expect(parseSettings({ ...DEFAULT_SETTINGS, rules })?.rules).toEqual(rules);
+  expect(DEFAULT_SETTINGS.categories).toEqual([]);
+  const result = addStarterCategories(DEFAULT_SETTINGS);
+  expect(result.categories).toEqual(STARTER_CATEGORIES);
+  expect(parseSettings({ ...DEFAULT_SETTINGS, ...result })?.categories).toEqual(STARTER_CATEGORIES);
 });
 
-it('preserves existing rules and adds each starter only once', () => {
-  const existing = ['Hide newsletter prompts.', ...STARTER_RULES.slice(0, 1)];
-  const rules = addStarterRules(existing);
-  expect(rules).toEqual(['Hide newsletter prompts.', ...STARTER_RULES]);
-  expect(addStarterRules(rules)).toEqual(rules);
-  expect(existing).toEqual(['Hide newsletter prompts.', ...STARTER_RULES.slice(0, 1)]);
+it('moves existing starter rules into their groups and preserves custom rules', () => {
+  const rules = [
+    'Hide sports scores.',
+    ...STARTER_CATEGORIES.flatMap((category) => category.rules),
+  ];
+  const result = addStarterCategories({ rules, categories: [] });
+  expect(result.rules).toEqual(['Hide sports scores.']);
+  expect(result.categories).toEqual(STARTER_CATEGORIES);
+  expect(addStarterCategories(result)).toEqual(result);
+  expect(rules.length).toBe(5);
 });
 
-it('fills available slots without dropping existing rules or exceeding the limit', () => {
-  const existing = Array.from({ length: LIMITS.rules - 1 }, (_, index) => `Rule ${index}`);
-  const rules = addStarterRules(existing);
-  expect(rules).toEqual([...existing, ...STARTER_RULES.slice(0, 1)]);
-  expect(addStarterRules(rules)).toEqual(rules);
-  const afterRemoval = rules.filter((rule) => rule !== 'Rule 0');
-  expect(addStarterRules(afterRemoval)).toEqual([...afterRemoval, ...STARTER_RULES.slice(1, 2)]);
+it('preserves edited categories and only removes custom rules already covered by the same starter group', () => {
+  const ads = STARTER_CATEGORIES[0];
+  assert.ok(ads !== undefined);
+  const edited = {
+    ...ads,
+    name: 'Paid placements',
+    enabled: false,
+    rules: ['Hide promoted links.'],
+  };
+  const result = addStarterCategories({ rules: ads.rules, categories: [edited] });
+  expect(result.categories[0]).toEqual(edited);
+  expect(result.rules).toEqual(ads.rules);
+});
+
+it('does not add partial categories or exceed the total rule limit', () => {
+  const rules = Array.from({ length: LIMITS.rules - 1 }, (_, index) => `Rule ${index}`);
+  const result = addStarterCategories({ rules, categories: [] });
+  expect(result.rules).toEqual(rules);
+  expect(result.categories.map((category) => category.id)).toEqual(['cookie-consent']);
+  expect(addStarterCategories(result)).toEqual(result);
 });

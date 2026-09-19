@@ -1,4 +1,5 @@
 import { makeRequest } from '../classifier/client';
+import { activeRules } from '../config/categories';
 import { LIMITS } from '../config/defaults';
 import type { AdCandidate, CandidateClassification, Settings } from '../shared/types';
 import { parseClassifications, send } from './messages';
@@ -17,7 +18,7 @@ interface QueueOptions {
   readonly ruleCount: () => number;
   readonly settings: () => Settings | null;
   readonly current: (pending: Readonly<PendingCandidate>) => boolean;
-  readonly apply: (pending: Readonly<PendingCandidate>, probability: number) => void;
+  readonly apply: (pending: Readonly<PendingCandidate>, result: CandidateClassification) => void;
   readonly wake: () => void;
   readonly fail: (message: string) => void;
   readonly generation: () => number;
@@ -28,9 +29,9 @@ export class ClassificationQueue {
   private readonly queue: PendingCandidate[] = [];
   private readonly decisions: {
     readonly pending: PendingCandidate;
-    readonly probability: number;
+    readonly result: CandidateClassification;
   }[] = [];
-  private readonly cache = new Map<string, number>();
+  private readonly cache = new Map<string, CandidateClassification>();
   private seen = new WeakMap<Element, string>();
   private active = false;
   private timer: number | undefined;
@@ -79,7 +80,7 @@ export class ClassificationQueue {
       this.queue.push(pending);
     } else {
       this.metrics.cacheHits++;
-      this.decisions.push({ pending, probability: cached });
+      this.decisions.push({ pending, result: cached });
     }
     return true;
   }
@@ -91,7 +92,7 @@ export class ClassificationQueue {
   applyNext(): boolean {
     const decision = this.decisions.shift();
     if (decision === undefined) return false;
-    this.options.apply(decision.pending, decision.probability);
+    this.options.apply(decision.pending, decision.result);
     return true;
   }
 
@@ -175,7 +176,7 @@ export class ClassificationQueue {
         makeRequest(
           settings.provider,
           batch.slice(0, count).map((entry) => entry.candidate),
-          settings.rules,
+          activeRules(settings).map((rule) => rule.text),
           settings.model,
         );
         break;
@@ -220,6 +221,14 @@ export class ClassificationQueue {
       this.serviceFailure(batch, response.error, response.retryAfterMs);
       return;
     }
+    if (
+      response.results.some(
+        (result) => result.ruleProbabilities.length !== this.options.ruleCount(),
+      )
+    ) {
+      this.serviceFailure(batch, 'Invalid rule decisions. Content remains visible.');
+      return;
+    }
     this.retries = 0;
     this.acceptResults(response.results, batch);
     this.options.wake();
@@ -244,15 +253,16 @@ export class ClassificationQueue {
   ): void {
     for (const result of results) {
       const pending = batch.find((entry) => entry.candidate.id === result.id);
-      if (pending === undefined) continue;
+      if (pending === undefined || result.ruleProbabilities.length !== this.options.ruleCount())
+        continue;
       if (this.cache.size >= LIMITS.cacheEntries) {
         const oldest = this.cache.keys().next().value;
         if (oldest !== undefined) this.cache.delete(oldest);
       }
-      if (this.options.cacheEnabled()) this.cache.set(pending.fingerprint, result.probability);
+      if (this.options.cacheEnabled()) this.cache.set(pending.fingerprint, result);
       for (const matching of batch) {
         if (matching.fingerprint === pending.fingerprint)
-          this.decisions.push({ pending: matching, probability: result.probability });
+          this.decisions.push({ pending: matching, result });
       }
     }
   }

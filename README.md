@@ -1,6 +1,6 @@
 # TidyUp
 
-TidyUp is a Chrome and Firefox extension that tidies web pages according to your rules. You write the rules for what to hide. The extension collects visible page regions after page load, evaluates your rules in parallel, and hides matching regions reversibly. No rules are enabled by default. An empty rule list leaves everything visible and makes no page-classification requests.
+TidyUp is a Chrome and Firefox extension that tidies web pages according to your rules. You write the rules for what to hide. The extension collects visible page regions after page load, evaluates your rules in parallel, and hides matching regions reversibly. No rules are enabled by default. When no rules are active, everything stays visible and no page-classification requests are made.
 
 ## Try it
 
@@ -18,25 +18,25 @@ For Firefox 140 or newer, open `about:debugging#/runtime/this-firefox`, select L
 1. Open the extension popup, then Settings. Settings opens inside the popup, with tabs for Rules, Connection, and Preferences. Use the back arrow to return to the current website. Both views follow your system's light or dark theme.
 2. Choose TypeSafe or OpenRouter and enter your own API key. OpenRouter shows a selector with Jev as the only supported choice; TypeSafe uses Jev directly. Keys are stored separately for each provider in local extension storage. A blank key field preserves the saved key.
 3. Select Save and test. This sends a fixed example, not page content, and verifies that the provider returns a decision.
-4. Add a plain-language rule in Settings, or select Add starter rules for display ads, advertising backgrounds, and cookie consent overlays. Review the list and save it. Starter rules preserve your existing rules and skip duplicates. You can remove any rule before saving. Rules describe conditions for hiding, not filter-list syntax.
+4. Add a custom rule in Settings, or select Add starter categories for Ads, Cookie consent, and Subscription prompts. Review and save the groups. You can rename categories, edit their rules, create groups, or keep custom rules outside a category. Adding starter categories moves matching starter rules into their groups and preserves your other rules. Rules describe conditions for hiding, not filter-list syntax.
 5. Choose Automatic or Manual activation in Settings. Automatic starts after each page load. Manual waits for Run now in the popup, then follows new content on that page until navigation or Show blocked content. Saving settings resets Manual mode to waiting. Open a public website while the extension is enabled. If the tab predates installation, reload it once.
-6. Let the page settle. The popup reports hidden regions in the main frame. Show hidden restores them and pauses hiding until Scan again.
+6. Let the page settle. The popup reports hidden regions in the main frame and counts for each category. Category switches apply across websites. A region can match several categories, so their counts can exceed the total. Show hidden restores the regions and pauses hiding until Scan again.
 
-The default confidence threshold is 90%, configurable from 90% to 100% in Settings. A region is hidden when any rule matches at or above this threshold. Rules are independent; a rule that does not match does not override another matching rule. You can add up to 20 rules of 500 characters each.
+The default confidence threshold is 90%, configurable from 90% to 100% in Settings. A region is hidden when any rule matches at or above this threshold. Rules are independent; a rule that does not match does not override another matching rule. You can add up to 20 rules of 500 characters each across custom rules and categories, including disabled groups. Disabled categories do not participate in classification. Subscription starter rules cover promotional offers and keep access-restricting paywalls visible.
 
 Hiding a consent overlay does not accept or reject cookies. The dialog wrapper is hidden and page scrolling is unlocked. Use Show hidden to restore the prompt and its scroll lock when you want to choose. Advertising backgrounds are removed without hiding the page content.
 
-Debug mode outlines candidates instead of hiding them. Red meets the threshold, green is a likely non-match, and yellow is uncertain. Settings changes restore hidden regions. Automatic mode resumes with the updated rules; Manual mode waits for Run now. Removing every rule stops scanning and restores hidden content.
+Debug mode outlines candidates instead of hiding them. Red meets the threshold, green is a likely non-match, and yellow is uncertain. Settings changes restore hidden regions. Automatic mode resumes with the updated rules; Manual mode waits for Run now. Disabling or removing every active rule stops scanning and restores hidden content.
 
 ## Decision cache
 
 Caching is enabled by default and survives reloads and browser restarts. Settings and the popup each have a Remember decisions switch, for all websites and the current website respectively. Each view also has a button to clear its cache. Disabling caching bypasses both stored and page-local decisions for that scope; it does not delete previously stored entries. Clear buttons delete them.
 
-Decisions are keyed by hashes of the candidate, site, provider, and complete rule list. Changing rules or provider prevents reuse of previous decisions. Changing the confidence threshold reuses probabilities with the new threshold. The cache stores hashes, probabilities, and timestamps, with a seven-day expiry and a maximum of 2,048 entries. It does not store candidate text or website addresses. Scan again reuses eligible persistent decisions; use Clear site cache to request fresh evaluations.
+Decisions are keyed by hashes of the candidate, site, provider, and active rules and their category assignments. Changing rules or provider prevents reuse of previous decisions. Changing the confidence threshold reuses probabilities with the new threshold. The cache stores hashes, per-rule probabilities, and timestamps, with a seven-day expiry and a maximum of 2,048 entries. It does not store candidate text or website addresses. Scan again reuses eligible persistent decisions; use Clear site cache to request fresh evaluations.
 
 ## Data and permissions
 
-While enabled with at least one saved rule, the extension evaluates candidates on public websites according to the activation setting. Manual mode does not scan or classify until Run now is selected. It sends your rules, short visible region descriptions, descriptive signals, coarse layout information, and destination hostnames to the selected service. Use the popup or the excluded-sites list in Settings to disable a site. Localhost, IP addresses, and internal hostnames are not scanned.
+While enabled with at least one active rule, the extension evaluates candidates on public websites according to the activation setting. Manual mode does not scan or classify until Run now is selected. It sends your rules, short visible region descriptions, descriptive signals, coarse layout information, and destination hostnames to the selected service. Use the popup or the excluded-sites list in Settings to disable a site. Localhost, IP addresses, and internal hostnames are not scanned.
 
 The extractor skips forms, editable regions, selected text, and hidden content. It never reads input values or sends raw HTML. URL paths, queries, fragments, and visible token-like strings are excluded or redacted. The background owns credentials and service calls; content scripts receive only settings and decisions. Keys are stored locally without application-level encryption, so this configuration is intended for personal use with your own credentials.
 

@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
+import { activeRules } from '../config/categories';
 import { candidateFingerprint } from '../candidates/fingerprint';
 import type { AdCandidate, ClassificationResponse, Settings } from '../shared/types';
-import { isCacheEnabled, isRecord } from '../shared/validation';
+import { isCacheEnabled, isRecord, parseRuleProbabilities } from '../shared/validation';
 import { PROVIDERS } from './client';
 import { POLICY_VERSION } from './policy';
 
@@ -13,6 +14,7 @@ interface Entry {
   readonly hash: string;
   readonly site: string;
   readonly probability: number;
+  readonly ruleProbabilities: readonly number[];
   readonly timestamp: number;
 }
 interface StoredCache {
@@ -37,7 +39,7 @@ function lookups(candidates: readonly AdCandidate[], settings: Settings): Promis
     POLICY_VERSION,
     PROVIDERS[settings.provider],
     settings.model,
-    settings.rules,
+    activeRules(settings),
   ]);
   return Promise.all(
     candidates.map(async (candidate) => ({
@@ -65,7 +67,11 @@ function parseEntry(value: unknown): Entry | null {
     Date.now() - value['timestamp'] >= TTL_MS
   )
     return null;
+  const ruleProbabilities = parseRuleProbabilities(value['ruleProbabilities']);
+  if (ruleProbabilities === null || Math.max(...ruleProbabilities) !== value['probability'])
+    return null;
   return {
+    ruleProbabilities,
     hash: value['hash'],
     site: value['site'],
     probability: value['probability'],
@@ -107,17 +113,21 @@ export async function withDecisionCache(
   if (!isCacheEnabled(settings, host)) return evaluate(candidates);
   const items = await lookups(candidates, settings);
   const snapshot = await navigator.locks.request('tidyup-cache', readCache);
-  const probabilities = new Map(snapshot.entries.map((entry) => [entry.hash, entry.probability]));
+  const probabilities = new Map(
+    snapshot.entries
+      .filter((entry) => entry.ruleProbabilities.length === activeRules(settings).length)
+      .map((entry) => [entry.hash, entry]),
+  );
   const missing = items.filter((item) => !probabilities.has(item.hash));
   const response =
     missing.length === 0
       ? ({ ok: true, results: [] } as const)
       : await evaluate(missing.map((item) => item.candidate));
   if (!response.ok) return response;
-  const additions = collectDecisions(missing, response);
+  const additions = collectDecisions(missing, response, activeRules(settings).length);
   if (additions === null)
     return { ok: false, error: 'Incomplete classification. Content remains visible.' };
-  for (const entry of additions) probabilities.set(entry.hash, entry.probability);
+  for (const entry of additions) probabilities.set(entry.hash, entry);
   return navigator.locks.request('tidyup-cache', async () => {
     const current = await readCache();
     if (current.epoch !== snapshot.epoch)
@@ -127,7 +137,8 @@ export async function withDecisionCache(
       ok: true,
       results: items.map((item) => ({
         id: item.candidate.id,
-        probability: probabilities.get(item.hash) ?? 0,
+        probability: probabilities.get(item.hash)?.probability ?? 0,
+        ruleProbabilities: probabilities.get(item.hash)?.ruleProbabilities ?? [],
       })),
     };
   });
@@ -136,15 +147,24 @@ export async function withDecisionCache(
 function collectDecisions(
   missing: readonly Lookup[],
   response: Extract<ClassificationResponse, { readonly ok: true }>,
+  ruleCount: number,
 ): Entry[] | null {
   const entries: Entry[] = [];
   for (const item of missing) {
     const result = response.results.find((answer) => answer.id === item.candidate.id);
     if (result === undefined) return null;
+    const ruleProbabilities = parseRuleProbabilities(result.ruleProbabilities);
+    if (
+      ruleProbabilities === null ||
+      ruleProbabilities.length !== ruleCount ||
+      Math.max(...ruleProbabilities) !== result.probability
+    )
+      return null;
     entries.push({
       hash: item.hash,
       site: item.site,
       probability: result.probability,
+      ruleProbabilities: result.ruleProbabilities,
       timestamp: Date.now(),
     });
   }

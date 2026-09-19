@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 
+import { activeRules } from '../../lib/config/categories';
 import type { ExtensionMessage, PublicSettings } from '../../lib/shared/types';
 import { isPublicHost } from '../../lib/shared/validation';
 import { element, errorMessage, pageStatus, sendSettings } from '../../lib/ui/messages';
@@ -17,6 +18,7 @@ let current: PublicSettings | undefined;
 let tabId: number | undefined;
 let host = '';
 let pageAvailable = false;
+let hiddenByCategory: Readonly<Record<string, number>> = {};
 
 function render(): void {
   if (current === undefined) return;
@@ -27,12 +29,14 @@ function render(): void {
   site.checked = isPublicHost(host) && !current.settings.disabledSites.includes(host);
   site.disabled = !isPublicHost(host);
   renderCache();
-  const noRules = current.settings.rules.length === 0;
+  const count = activeRules(current.settings).length;
+  const noRules = count === 0;
+  renderCategories();
   element('#rules-empty', HTMLParagraphElement).hidden = !noRules;
   const provider = current.settings.provider === 'typesafe' ? 'TypeSafe' : 'OpenRouter';
   element('#provider-name', HTMLElement).textContent = provider;
-  const count = current.settings.rules.length;
-  element('#rules-link', HTMLElement).textContent = `${count} ${count === 1 ? 'rule' : 'rules'}`;
+  element('#rules-link', HTMLElement).textContent =
+    `${count} active ${count === 1 ? 'rule' : 'rules'}`;
   const icon = element('#provider', HTMLElement);
   icon.dataset['provider'] = current.settings.provider;
   icon.title = provider;
@@ -44,6 +48,59 @@ function render(): void {
     current.settings.activation === 'manual' ? 'Manual activation' : 'Automatic activation';
   rescan.disabled =
     noRules || !pageAvailable || !current.configured || !current.settings.enabled || !site.checked;
+}
+
+function renderCategories(): void {
+  if (current === undefined) return;
+  const list = element('#categories', HTMLDivElement);
+  const focused = document.activeElement;
+  const focusedId = focused instanceof HTMLInputElement ? focused.dataset['category'] : undefined;
+  list.replaceChildren();
+  element('#categories-empty', HTMLParagraphElement).hidden =
+    current.settings.categories.length > 0;
+  for (const category of current.settings.categories) {
+    const row = document.createElement('label');
+    row.className = 'switch-row category-row';
+    const copy = document.createElement('span');
+    const name = document.createElement('strong');
+    name.textContent = category.name;
+    const count = document.createElement('small');
+    count.textContent = pageAvailable
+      ? `${hiddenByCategory[category.id] ?? 0} hidden on this page`
+      : `${category.rules.length} ${category.rules.length === 1 ? 'rule' : 'rules'}`;
+    copy.append(name, count);
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.role = 'switch';
+    toggle.checked = category.enabled;
+    toggle.dataset['category'] = category.id;
+    toggle.setAttribute('aria-label', `Enable ${category.name}`);
+    toggle.addEventListener('change', () => {
+      toggleCategory(category.id, toggle.checked);
+    });
+    row.append(copy, toggle);
+    list.append(row);
+    if (focusedId === category.id) toggle.focus();
+  }
+  const custom = element('#custom-rules', HTMLParagraphElement);
+  custom.hidden = current.settings.rules.length === 0;
+  custom.textContent = `${current.settings.rules.length} custom ${current.settings.rules.length === 1 ? 'rule' : 'rules'} also active.`;
+}
+
+function toggleCategory(id: string, checked: boolean): void {
+  run(async () => {
+    if (current === undefined) return;
+    current = await sendSettings({
+      type: 'SAVE_SETTINGS',
+      settings: {
+        ...current.settings,
+        categories: current.settings.categories.map((category) =>
+          category.id === id ? { ...category, enabled: checked } : category,
+        ),
+      },
+    });
+    await refreshPage();
+  });
 }
 
 function renderCache(): void {
@@ -64,6 +121,7 @@ async function refreshPage(): Promise<void> {
   try {
     const page = await pageStatus(tabId);
     pageAvailable = true;
+    hiddenByCategory = page.hiddenByCategory;
     element('#blocked', HTMLElement).textContent = String(page.metrics.hidden);
     if (page.error !== '') status.textContent = page.error;
     else if (page.waitingForActivation)
@@ -77,6 +135,7 @@ async function refreshPage(): Promise<void> {
     else status.textContent = 'Blocking is off on this page.';
   } catch {
     pageAvailable = false;
+    hiddenByCategory = {};
     status.textContent = 'Reload this tab to start the extension.';
   }
 }

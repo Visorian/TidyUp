@@ -69,17 +69,27 @@
                 <button id="add-starter-rules" type="button" aria-describedby="starter-rules-hint">
                   <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" /></svg
-                  >Add starter rules
+                  >Add starter categories
                 </button>
                 <p id="starter-rules-hint" class="hint">
-                  Display ads, advertising backgrounds, and cookie overlays. Hiding a consent prompt
-                  does not accept or reject cookies.
+                  Ads, cookie consent, and subscription prompts. Hiding consent does not accept
+                  cookies; hiding a subscription prompt does not unlock paid content.
                 </p>
               </div>
               <p id="rules-empty" class="empty-state">
                 No rules yet. Start with the basics above, or write your own below.
               </p>
-              <ul id="rules" aria-label="Blocking rules"></ul>
+              <div id="categories" aria-label="Rule categories"></div>
+              <div class="new-category">
+                <label for="new-category">Create a category</label>
+                <div class="category-create">
+                  <input id="new-category" type="text" maxlength="60" placeholder="Category name" />
+                  <button id="add-category" type="button">Create</button>
+                </div>
+              </div>
+              <h3>Custom rules</h3>
+              <p class="hint">These rules apply independently of category switches.</p>
+              <ul id="rules" class="rule-list" aria-label="Custom rules"></ul>
               <label for="new-rule">Add your own rule</label>
               <textarea
                 id="new-rule"
@@ -89,7 +99,8 @@
                 aria-describedby="rules-hint rule-notice"
               ></textarea>
               <div class="rule-actions">
-                <span id="rules-hint" class="hint">Up to 20 rules, 500 characters each.</span
+                <span id="rules-hint" class="hint"
+                  >Up to 20 rules across all categories, 500 characters each.</span
                 ><button id="add-rule" type="button">Add rule</button>
               </div>
               <p id="rule-notice" role="status" aria-live="polite"></p>
