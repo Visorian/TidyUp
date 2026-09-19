@@ -85,7 +85,7 @@ export interface CandidateFeatures {
   readonly display: CandidateDisplay;
 }
 
-function elementDescription(element: Element): string {
+export function elementDescription(element: Element): string {
   return sanitizeText(
     [element.getAttribute('alt'), element.getAttribute('title'), element.getAttribute('aria-label')]
       .filter((value) => value !== null)
@@ -93,7 +93,7 @@ function elementDescription(element: Element): string {
   ).slice(0, 96);
 }
 
-function linkedHost(element: Element): string | null {
+export function linkedHost(element: Element): string | null {
   const link =
     element instanceof HTMLAnchorElement
       ? element.getAttribute('href')
@@ -103,7 +103,7 @@ function linkedHost(element: Element): string | null {
   return link === null ? null : safeHost(link, element.ownerDocument.baseURI);
 }
 
-function displayFeatures(
+export function displayFeatures(
   element: Element,
   text: string,
   frames: number,
@@ -212,7 +212,7 @@ export function collectFeatures(element: Element): CandidateFeatures | null {
   };
 }
 
-function nextOutsideSubtree(walker: TreeWalker, root: Element): Node | null {
+export function nextOutsideSubtree(walker: TreeWalker, root: Element): Node | null {
   while (walker.nextSibling() === null) {
     if (walker.parentNode() === null || walker.currentNode === root) return null;
   }

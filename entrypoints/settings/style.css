@@ -1,0 +1,238 @@
+@import '../../lib/ui/style.css';
+
+body {
+  height: 580px;
+  overflow: hidden;
+}
+.settings-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.app-header {
+  padding: 13px 18px 13px 10px;
+  background: var(--surface);
+}
+.settings-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+h1 {
+  font-size: 18px;
+}
+.settings-brand {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+#settings-form,
+#controls {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.settings-tabs {
+  display: flex;
+  padding: 0 20px;
+  gap: 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.settings-tabs button {
+  padding: 11px 0;
+  min-height: 42px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+}
+.settings-tabs button[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.settings-tabs button:hover {
+  color: var(--text);
+}
+.settings-scroll {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+h2 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+.intro {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+label:not(.switch-row) {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 7px;
+}
+.starter-section {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+#add-starter-rules {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+#add-starter-rules:hover {
+  border-color: var(--accent);
+}
+.empty-state {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin: 0 0 20px;
+}
+#rules {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px;
+}
+#rules:empty {
+  display: none;
+}
+#rules li {
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+#rules li:first-child {
+  padding-top: 0;
+}
+#rules span {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
+#rules button {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 5px;
+  min-height: 28px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+}
+#rules button:hover {
+  color: var(--error);
+  text-decoration: underline;
+}
+.rule-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 9px;
+}
+.rule-actions .hint {
+  margin: 0;
+  max-width: 190px;
+}
+#rule-notice {
+  font-size: 12px;
+  color: var(--success);
+  margin: 12px 0 0;
+}
+.field {
+  margin-top: 20px;
+}
+.setting-row {
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.confidence-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.confidence-row label {
+  margin: 0;
+}
+.number-field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+.number-field input {
+  width: 82px;
+}
+.connection-test {
+  width: 100%;
+}
+.danger {
+  color: var(--error) !important;
+  font-size: 12px;
+}
+.privacy-note {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.privacy-note .icon {
+  color: var(--accent);
+}
+.privacy-note p {
+  margin: 0;
+}
+.excluded-sites {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.excluded-sites summary {
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+.save-bar {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding: 13px 20px;
+}
+.save-bar > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.save-bar span {
+  font-size: 11px;
+  color: var(--muted);
+}
+#status,
+#error {
+  font-size: 12px;
+  margin: 0 0 9px;
+}
+#status {
+  color: var(--success);
+}
+#status:empty,
+#error:empty,
+#rule-notice:empty {
+  display: none;
+}

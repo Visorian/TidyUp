@@ -1,3 +1,5 @@
+import { LIMITS } from '../../lib/config/defaults';
+import { addStarterRules, STARTER_RULES } from '../../lib/config/starter-rules';
 import { element } from '../../lib/ui/messages';
 
 const list = element('#rules', HTMLUListElement);
@@ -44,8 +46,8 @@ export function readRules(): readonly string[] {
 
 element('#add-rule', HTMLButtonElement).addEventListener('click', () => {
   const rule = input.value.trim();
-  if (rule === '' || rule.length > 500 || rules.length >= 20) {
-    notice.textContent = 'Enter a rule of up to 500 characters. You can add up to 20 rules.';
+  if (rule === '' || rule.length > LIMITS.ruleLength || rules.length >= LIMITS.rules) {
+    notice.textContent = `Enter a rule of up to ${LIMITS.ruleLength} characters. You can add up to ${LIMITS.rules} rules.`;
     input.focus();
     return;
   }
@@ -58,4 +60,19 @@ element('#add-rule', HTMLButtonElement).addEventListener('click', () => {
   render();
   notice.textContent = 'Rule added. Save settings to apply.';
   input.focus();
+});
+
+element('#add-starter-rules', HTMLButtonElement).addEventListener('click', () => {
+  const nextRules = addStarterRules(rules);
+  const added = nextRules.length - rules.length;
+  const remaining = STARTER_RULES.filter((rule) => !nextRules.includes(rule)).length;
+  rules = nextRules;
+  render();
+  if (remaining > 0) {
+    notice.textContent = `Added ${added} of the missing starter rules. The list is full. Remove rules to make room for the remaining ${remaining}, then try again. Save settings to apply changes.`;
+  } else if (added > 0) {
+    notice.textContent = 'Starter rules added. Review the list, then save settings to apply.';
+  } else {
+    notice.textContent = 'All starter rules are already in the list.';
+  }
 });

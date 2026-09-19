@@ -1,5 +1,6 @@
 import type { AdCandidate } from '../shared/types';
 import { CARD_CONTAINERS, collectFeatures, metadataLabels } from './features';
+import { extractSpecialCandidate, hasConsentAncestor } from './regions';
 import { hasPrivateAncestor, isVisible } from './visibility';
 
 const CONTAINERS = 'div,section,article,aside,li,ins,iframe,a,[role="article"],[role="listitem"]';
@@ -23,6 +24,9 @@ export function extractCandidate(
   id: string,
   pageHost: string,
 ): AdCandidate | null {
+  const special = extractSpecialCandidate(element, id, pageHost);
+  if (special !== null) return special;
+  if (element.matches('dialog,[aria-modal="true"]') || hasConsentAncestor(element)) return null;
   if (!element.matches(CONTAINERS) || element.matches(ESSENTIAL) || hasPrivateAncestor(element))
     return null;
   if (element.childNodes.length > 24 || !hasContentBoundary(element) || !isVisible(element))

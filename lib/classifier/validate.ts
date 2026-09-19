@@ -55,6 +55,7 @@ export function parseCandidates(value: unknown, pageHost: string): readonly AdCa
       typeof item['text'] !== 'string' ||
       item['text'].length > LIMITS.text ||
       item['pageHost'] !== pageHost ||
+      (item['kind'] !== undefined && item['kind'] !== 'consent' && item['kind'] !== 'background') ||
       !strings(item['labels'], 12, 40) ||
       !strings(item['linkHosts'], 8, 253) ||
       !item['linkHosts'].every(isPublicHost) ||
@@ -66,6 +67,7 @@ export function parseCandidates(value: unknown, pageHost: string): readonly AdCa
     ids.add(item['id']);
     result.push({
       id: item['id'],
+      ...(item['kind'] === undefined ? {} : { kind: item['kind'] }),
       tag: item['tag'],
       text: item['text'],
       pageHost,

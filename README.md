@@ -1,6 +1,6 @@
 # TidyUp
 
-TidyUp is a Chrome and Firefox extension that tidies web pages according to your rules. You write the rules for what to hide. The extension collects small visible page regions after page load, evaluates your rules in parallel, and hides matching regions reversibly. There are no built-in blocking rules. An empty rule list leaves everything visible and makes no page-classification requests.
+TidyUp is a Chrome and Firefox extension that tidies web pages according to your rules. You write the rules for what to hide. The extension collects visible page regions after page load, evaluates your rules in parallel, and hides matching regions reversibly. No rules are enabled by default. An empty rule list leaves everything visible and makes no page-classification requests.
 
 ## Try it
 
@@ -15,20 +15,22 @@ For Chrome, open `chrome://extensions`, enable Developer mode, select Load unpac
 
 For Firefox 140 or newer, open `about:debugging#/runtime/this-firefox`, select Load Temporary Add-on, and choose `.output/firefox-mv3/manifest.json`.
 
-1. Open the extension popup, then Settings.
+1. Open the extension popup, then Settings. Settings opens inside the popup, with tabs for Rules, Connection, and Preferences. Use the back arrow to return to the current website. Both views follow your system's light or dark theme.
 2. Choose TypeSafe or OpenRouter and enter your own API key. OpenRouter shows a selector with Jev as the only supported choice; TypeSafe uses Jev directly. Keys are stored separately for each provider in local extension storage. A blank key field preserves the saved key.
 3. Select Save and test. This sends a fixed example, not page content, and verifies that the provider returns a decision.
-4. Add a plain-language rule in Settings and save it. For example, you could enter `Hide paid advertisements and sponsored placements.` This is only an example, never an automatic default. Add or remove rules from the same list. Rules describe conditions for hiding, not filter-list syntax.
+4. Add a plain-language rule in Settings, or select Add starter rules for display ads, advertising backgrounds, and cookie consent overlays. Review the list and save it. Starter rules preserve your existing rules and skip duplicates. You can remove any rule before saving. Rules describe conditions for hiding, not filter-list syntax.
 5. Choose Automatic or Manual activation in Settings. Automatic starts after each page load. Manual waits for Run now in the popup, then follows new content on that page until navigation or Show blocked content. Saving settings resets Manual mode to waiting. Open a public website while the extension is enabled. If the tab predates installation, reload it once.
-6. Let the page settle. The popup reports hidden regions in the main frame. Show blocked elements restores them and pauses hiding until Scan again.
+6. Let the page settle. The popup reports hidden regions in the main frame. Show hidden restores them and pauses hiding until Scan again.
 
 The default confidence threshold is 90%, configurable from 90% to 100% in Settings. A region is hidden when any rule matches at or above this threshold. Rules are independent; a rule that does not match does not override another matching rule. You can add up to 20 rules of 500 characters each.
+
+Hiding a consent overlay does not accept or reject cookies. The dialog wrapper is hidden and page scrolling is unlocked. Use Show hidden to restore the prompt and its scroll lock when you want to choose. Advertising backgrounds are removed without hiding the page content.
 
 Debug mode outlines candidates instead of hiding them. Red meets the threshold, green is a likely non-match, and yellow is uncertain. Settings changes restore hidden regions. Automatic mode resumes with the updated rules; Manual mode waits for Run now. Removing every rule stops scanning and restores hidden content.
 
 ## Decision cache
 
-Caching is enabled by default and survives reloads and browser restarts. Settings has a global cache switch and a Clear cached decisions button. The popup has a Cache this site checkbox and a Clear site cache button. Disabling caching bypasses both stored and page-local decisions for that scope; it does not delete previously stored entries. Clear buttons delete them.
+Caching is enabled by default and survives reloads and browser restarts. Settings and the popup each have a Remember decisions switch, for all websites and the current website respectively. Each view also has a button to clear its cache. Disabling caching bypasses both stored and page-local decisions for that scope; it does not delete previously stored entries. Clear buttons delete them.
 
 Decisions are keyed by hashes of the candidate, site, provider, and complete rule list. Changing rules or provider prevents reuse of previous decisions. Changing the confidence threshold reuses probabilities with the new threshold. The cache stores hashes, probabilities, and timestamps, with a seven-day expiry and a maximum of 2,048 entries. It does not store candidate text or website addresses. Scan again reuses eligible persistent decisions; use Clear site cache to request fresh evaluations.
 
@@ -49,7 +51,9 @@ No requests are intercepted or blocked, and no DOM nodes are deleted. Both brows
 - Timeouts, malformed results, failed requests, and storage errors leave undecided content visible. Temporary failures resume after the service cooldown, with at most two consecutive automatic retries. The popup reports failures; Scan again restarts a suspended scan.
 - Each permitted frame has its own session. Open shadow roots are inspected; closed roots are not. Broad containers and candidates with insufficient evidence are left visible.
 
-Candidate collection uses structural boundaries and does not require advertising keywords. It still excludes broad containers, forms, essential interface regions, and regions exceeding 80 nodes or 400 normalized text characters. Rules can only act on extracted regions, so large promotions, page skins, and inaccessible frame content may remain visible. Use reveal and debug mode to inspect results.
+Ordinary candidate collection uses structural boundaries and excludes forms, essential interface regions, and regions exceeding 80 nodes or 400 normalized text characters. Consent overlays have a separate bounded scan of up to 240 nodes and 8,000 raw characters, reduced to a sanitized 400-character preview. Frame titles can identify consent wrappers without reading the frame's contents. Native modal dialogs and regions containing private inputs remain excluded.
+
+Page-background candidates contain only the container's own metadata and background-image hostnames. They never include the article or form contents inside that container. Classification still needs evidence that the image is advertising; decorative backgrounds, images without useful metadata, pseudo-element artwork, and inaccessible frame content may remain visible. Use Show hidden and debug mode to inspect results.
 
 ## Development
 
@@ -67,3 +71,5 @@ WXT owns Vite bundling for both targets. Development commands start its server; 
 `bun run check` runs Oxfmt, type-aware Oxlint, TypeScript 7, both browser builds, and Vitest. Strict checking forbids explicit `any`, unsafe assertions, unhandled promises, and TypeScript suppression comments. Mutable DOM handles are exempt from the readonly-parameter rule because DOM mutation is part of the extension's work. Application data stays readonly. Warnings and unused lint suppressions fail checks.
 
 Tests cover parallel rule requests, empty-rule behavior, invalid responses, persistent cache reuse and invalidation, cache controls, candidate validation, and text redaction. Manifest tests protect idle injection and the absence of network-blocking permissions. `tests/fixtures/candidates.html` supplies ordinary, sponsored, hidden, private-form, editable, and shadow-root regions for browser verification.
+
+With the development server running, open `/tests/fixtures/regions.html` on its local address to run browser checks for consent and background extraction, reversible hiding, scroll restoration, private fields, queue overlap, and dynamic style changes. These checks use local fixtures without calling a provider.

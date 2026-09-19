@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TidyUp region checks</title>
+  </head>
+  <body>
+    <script type="module">
+      import { runRegionChecks } from '../browser-regions';
+
+      try {
+        const checks = await runRegionChecks();
+        const report = document.createElement('pre');
+        report.id = 'results';
+        report.textContent = checks.join('\n');
+        document.body.replaceChildren(report);
+      } catch (error) {
+        document.body.textContent = String(error);
+        throw error;
+      }
+    </script>
+  </body>
+</html>

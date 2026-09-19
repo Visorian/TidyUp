@@ -5,6 +5,7 @@ export function candidateFingerprint(candidate: Readonly<AdCandidate>): string {
   return JSON.stringify([
     candidate.pageHost,
     candidate.tag,
+    candidate.kind,
     candidate.text,
     candidate.labels,
     candidate.linkHosts,

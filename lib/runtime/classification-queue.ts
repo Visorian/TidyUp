@@ -44,24 +44,25 @@ export class ClassificationQueue {
   get size(): number {
     return this.queue.length;
   }
+  get full(): boolean {
+    return this.queue.length >= LIMITS.queue;
+  }
   get hasDecisions(): boolean {
     return this.decisions.length > 0;
   }
 
   add(pending: Readonly<PendingCandidate>): boolean {
     if (this.seen.get(pending.element) === pending.fingerprint) return false;
+    if (this.full) return false;
     this.seen.set(pending.element, pending.fingerprint);
     const cached = this.options.cacheEnabled() ? this.cache.get(pending.fingerprint) : undefined;
-    if (cached !== undefined) {
-      this.metrics.cacheHits++;
-      this.decisions.push({ pending, probability: cached });
-    } else if (this.queue.length >= LIMITS.queue) this.metrics.dropped++;
-    else {
+    if (cached === undefined) {
       if (
         this.queue.some(
           (entry) =>
-            (pending.element.contains(entry.element) && !isDisplaySlot(pending.candidate)) ||
-            (entry.element.contains(pending.element) && isDisplaySlot(entry.candidate)),
+            overlaps(pending, entry) &&
+            ((pending.element.contains(entry.element) && !prefersContainer(pending.candidate)) ||
+              (entry.element.contains(pending.element) && prefersContainer(entry.candidate))),
         )
       )
         return false;
@@ -69,12 +70,16 @@ export class ClassificationQueue {
         const entry = this.queue[index];
         if (
           entry !== undefined &&
+          overlaps(pending, entry) &&
           (entry.element.contains(pending.element) ||
-            (isDisplaySlot(pending.candidate) && pending.element.contains(entry.element)))
+            (prefersContainer(pending.candidate) && pending.element.contains(entry.element)))
         )
           this.queue.splice(index, 1);
       }
       this.queue.push(pending);
+    } else {
+      this.metrics.cacheHits++;
+      this.decisions.push({ pending, probability: cached });
     }
     return true;
   }
@@ -142,7 +147,7 @@ export class ClassificationQueue {
       LIMITS.batch,
       Math.floor(LIMITS.questions / Math.max(1, this.options.ruleCount())),
     );
-    const original = this.queue.splice(0, batchSize);
+    const original = this.fitBatch(this.queue.splice(0, batchSize));
     try {
       const batch = await this.prepare(original);
       if (generation !== this.options.generation() || this.options.checkNavigation()) return;
@@ -150,12 +155,13 @@ export class ClassificationQueue {
         this.queue.unshift(...original.slice(0, LIMITS.queue - this.queue.length));
         return;
       }
-      if (batch.length > 0) await this.request(this.fitBatch(batch), generation);
+      if (batch.length > 0) await this.request(batch, generation);
     } catch {
       if (generation === this.options.generation())
         this.options.fail('Classification failed; content remains visible.');
     } finally {
       this.active = false;
+      if (generation === this.options.generation() && this.options.runnable()) this.options.wake();
       this.schedule();
     }
   }
@@ -252,6 +258,13 @@ export class ClassificationQueue {
   }
 }
 
-function isDisplaySlot(candidate: AdCandidate): boolean {
-  return candidate.display?.labelOnly === true && candidate.labels.includes('advertisement');
+function overlaps(first: Readonly<PendingCandidate>, second: Readonly<PendingCandidate>): boolean {
+  return first.candidate.kind !== 'background' && second.candidate.kind !== 'background';
+}
+
+function prefersContainer(candidate: AdCandidate): boolean {
+  return (
+    candidate.kind === 'consent' ||
+    (candidate.display?.labelOnly === true && candidate.labels.includes('advertisement'))
+  );
 }

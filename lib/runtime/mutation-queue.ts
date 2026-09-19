@@ -1,3 +1,13 @@
+export function observeMutations(observer: Pick<MutationObserver, 'observe'>, root: Node): void {
+  observer.observe(root, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['style', 'class'],
+  });
+}
+
 export class MutationRoots {
   private readonly roots = new Set<Node>();
 

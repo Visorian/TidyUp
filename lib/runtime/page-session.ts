@@ -6,7 +6,7 @@ import type { PageStatus, PublicSettings } from '../shared/types';
 import { isCacheEnabled, isSiteEnabled } from '../shared/validation';
 import { parsePublicSettings, receivePageMessage, send } from './messages';
 import { IdleScheduler, createPageActivation } from './scheduler';
-import { MutationRoots } from './mutation-queue';
+import { MutationRoots, observeMutations } from './mutation-queue';
 import { ClassificationQueue } from './classification-queue';
 import type { PendingCandidate } from './classification-queue';
 
@@ -152,7 +152,7 @@ export class PageSession {
   }
   private begin(): void {
     if (!this.allowed() || !this.activation.active) return;
-    this.observer.observe(document, { childList: true, subtree: true, characterData: true });
+    observeMutations(this.observer, document);
     this.addRoot(document);
     this.schedule(300);
   }
@@ -217,7 +217,7 @@ export class PageSession {
         visited++;
         continue;
       }
-      if (!this.runnable()) break;
+      if (!this.runnable() || this.queue.full) break;
       if (this.walker === null) {
         const root = this.roots.take();
         if (root === undefined) break;
@@ -235,8 +235,7 @@ export class PageSession {
     this.queue.schedule();
     if (
       this.presentations.hasPending ||
-      this.walker !== null ||
-      this.roots.size > 0 ||
+      (!this.queue.full && (this.walker !== null || this.roots.size > 0)) ||
       this.queue.hasDecisions
     )
       this.schedule(0);
@@ -258,11 +257,7 @@ export class PageSession {
     this.metrics.scanned++;
     if (element.shadowRoot !== null && !this.observedShadows.has(element.shadowRoot)) {
       this.observedShadows.add(element.shadowRoot);
-      this.observer.observe(element.shadowRoot, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
+      observeMutations(this.observer, element.shadowRoot);
     }
     if (this.presentations.has(element) || !element.isConnected) return;
     const candidate = extractCandidate(element, `candidate_${++this.sequence}`, location.hostname);
@@ -286,9 +281,10 @@ export class PageSession {
   private apply(pending: Readonly<PendingCandidate>, probability: number): void {
     if (!this.current(pending) || this.configuration === null) return;
     const { threshold, debug } = this.configuration.settings;
-    if (this.presentations.apply(pending.element, probability, threshold, debug))
+    const { element, candidate } = pending;
+    if (this.presentations.apply(element, probability, threshold, debug, candidate.kind))
       this.metrics.hidden++;
-    if (this.presentations.has(pending.element)) watchPresentation(this.observer, pending.element);
+    if (this.presentations.has(element)) watchPresentation(this.observer, element);
   }
   private fail(message: string): void {
     this.error = message;

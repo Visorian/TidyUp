@@ -25,6 +25,7 @@ export interface PublicSettings {
 
 export interface AdCandidate {
   readonly id: string;
+  readonly kind?: 'consent' | 'background';
   readonly tag: string;
   readonly text: string;
   readonly labels: readonly string[];

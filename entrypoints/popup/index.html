@@ -7,55 +7,100 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main>
-      <header>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"
+          ><svg class="icon" viewBox="0 0 24 24">
+            <path
+              d="M4 7h10M4 12h7M4 17h10m4-14 1.2 3.8L23 8l-3.8 1.2L18 13l-1.2-3.8L13 8l3.8-1.2L18 3Z"
+            /></svg
+        ></span>
         <h1>TidyUp</h1>
-        <div class="header-controls">
-          <span
-            id="provider"
-            class="provider-icon"
-            role="img"
-            tabindex="0"
-            aria-label="Loading provider"
-            title="Loading provider"
-          >
-            <svg data-provider="openrouter" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 12h6m0 0 5-7h6M9 12l5 7h6M17 2l3 3-3 3m0 8 3 3-3 3" />
-            </svg>
-            <svg data-provider="typesafe" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Zm-4 9 3 3 5-6" />
-            </svg>
-          </span>
-          <button id="settings" type="button" class="text-button">Settings</button>
-        </div>
-      </header>
-      <p id="connection" class="muted" hidden>Add an API key in Settings to start.</p>
+      </div>
+      <a
+        id="settings"
+        class="button icon-button"
+        href="settings.html"
+        aria-label="Settings"
+        title="Settings"
+        ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 7h16M4 17h16M8 4v6m8 4v6" /></svg
+      ></a>
+    </header>
+    <main>
       <fieldset id="controls" disabled>
         <legend class="visually-hidden">Blocking controls</legend>
-        <label class="check"><input id="enabled" type="checkbox" /> Enable TidyUp</label>
-        <p id="activation" class="muted"></p>
-        <p id="rules-empty" hidden>
-          No rules yet. Open Settings to add rules. Nothing will be blocked.
+        <label class="switch-row power-row">
+          <span
+            ><strong id="power-label">TidyUp is on</strong
+            ><small id="activation">Loading settings…</small></span
+          >
+          <input id="enabled" type="checkbox" role="switch" aria-label="Enable TidyUp" />
+        </label>
+        <p id="connection" class="setup-note" hidden>
+          Add a provider key to get started.
+          <a href="settings.html#connection">Set up connection</a>
         </p>
-        <section aria-labelledby="host">
-          <h2 id="host">Current website</h2>
-          <label class="check"><input id="site" type="checkbox" /> Apply rules on this site</label>
-          <p class="muted consent">Turn this off to exclude this site in either activation mode.</p>
-          <label class="check cache-control">
-            <input id="cache-site" type="checkbox" aria-describedby="cache-hint" /> Cache this site
+        <p id="rules-empty" class="setup-note" hidden>
+          Choose what disappears. <a href="settings.html#rules">Add your first rules</a>
+        </p>
+        <section class="site-panel" aria-labelledby="host">
+          <label class="switch-row site-heading">
+            <span
+              ><span class="site-label">This website</span
+              ><strong id="host">No website selected</strong></span
+            >
+            <input id="site" type="checkbox" role="switch" aria-label="Apply rules on this site" />
           </label>
-          <p id="cache-hint" class="muted consent"></p>
-          <button id="clear-cache" type="button">Clear this site's cached decisions</button>
+          <div class="page-result">
+            <svg class="icon result-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 5h18v14H3zM3 9h18M7 14h4m4 0h2" />
+            </svg>
+            <p><strong id="blocked">0</strong><span>regions hidden on this page</span></p>
+          </div>
+          <p id="status" role="status">Checking this page…</p>
+          <div class="page-actions">
+            <button id="rescan" type="button" class="primary" disabled>Scan again</button>
+            <button id="reveal" type="button" disabled>Show hidden</button>
+          </div>
         </section>
-        <p class="result"><strong id="blocked">0</strong> hidden in the main page</p>
-        <p id="status" role="status">Loading page status…</p>
-        <div class="actions">
-          <button id="reveal" type="button" disabled>Show blocked content</button>
-          <button id="rescan" type="button" disabled>Scan again</button>
+        <div class="cache-section">
+          <label class="switch-row">
+            <span
+              ><strong>Remember decisions</strong
+              ><small id="cache-hint">Reuse results on your next visit.</small></span
+            >
+            <input
+              id="cache-site"
+              type="checkbox"
+              role="switch"
+              aria-label="Cache this site"
+              aria-describedby="cache-hint"
+            />
+          </label>
+          <button id="clear-cache" type="button" class="text-button">
+            Clear this site's cache
+          </button>
         </div>
       </fieldset>
       <p id="notice" role="alert"></p>
     </main>
+    <footer class="popup-footer">
+      <span class="provider-status"
+        ><span
+          id="provider"
+          class="provider-icon"
+          role="img"
+          aria-label="Loading provider"
+          title="Loading provider"
+          ><svg data-provider="openrouter" class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 12h6m0 0 5-7h6M9 12l5 7h6M17 2l3 3-3 3m0 8 3 3-3 3" /></svg
+          ><svg data-provider="typesafe" class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Zm-4 9 3 3 5-6" /></svg></span
+        ><span id="provider-name">Loading…</span></span
+      >
+      <a href="settings.html#rules" id="rules-link">Your rules</a>
+    </footer>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

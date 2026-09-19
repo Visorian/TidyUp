@@ -21,12 +21,18 @@ let pageAvailable = false;
 function render(): void {
   if (current === undefined) return;
   enabled.checked = current.settings.enabled;
+  element('#power-label', HTMLElement).textContent = current.settings.enabled
+    ? 'TidyUp is on'
+    : 'TidyUp is paused';
   site.checked = isPublicHost(host) && !current.settings.disabledSites.includes(host);
   site.disabled = !isPublicHost(host);
   renderCache();
   const noRules = current.settings.rules.length === 0;
   element('#rules-empty', HTMLParagraphElement).hidden = !noRules;
   const provider = current.settings.provider === 'typesafe' ? 'TypeSafe' : 'OpenRouter';
+  element('#provider-name', HTMLElement).textContent = provider;
+  const count = current.settings.rules.length;
+  element('#rules-link', HTMLElement).textContent = `${count} ${count === 1 ? 'rule' : 'rules'}`;
   const icon = element('#provider', HTMLElement);
   icon.dataset['provider'] = current.settings.provider;
   icon.title = provider;
@@ -45,9 +51,9 @@ function renderCache(): void {
   cache.checked = isPublicHost(host) && !current.settings.cacheDisabledSites.includes(host);
   cache.disabled = !isPublicHost(host) || !current.settings.cacheEnabled;
   clearCache.disabled = !isPublicHost(host);
-  element('#cache-hint', HTMLParagraphElement).textContent = current.settings.cacheEnabled
-    ? 'Reuse saved decisions when this site reloads.'
-    : 'Caching is off globally. Enable it in Settings to use this site preference.';
+  element('#cache-hint', HTMLElement).textContent = current.settings.cacheEnabled
+    ? 'Reuse results on your next visit.'
+    : 'Enable caching in Settings to use this.';
 }
 
 async function refreshPage(): Promise<void> {
@@ -139,10 +145,6 @@ reveal.addEventListener('click', () => {
 rescan.addEventListener('click', () => {
   run(() => actOnPage('RESCAN'));
 });
-element('#settings', HTMLElement).addEventListener('click', () => {
-  run(() => browser.runtime.openOptionsPage());
-});
-
 run(async () => {
   const [settings, tabs] = await Promise.all([
     sendSettings({ type: 'GET_SETTINGS' }),

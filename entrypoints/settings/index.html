@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TidyUp settings</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="settings-shell">
+      <header class="app-header">
+        <div class="settings-title">
+          <a
+            class="button icon-button"
+            href="popup.html"
+            aria-label="Back to TidyUp"
+            title="Back to TidyUp"
+            ><svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m14 6-6 6 6 6M8 12h12" /></svg
+          ></a>
+          <h1>Settings</h1>
+        </div>
+        <span class="settings-brand">TidyUp</span>
+      </header>
+      <form id="settings-form">
+        <fieldset id="controls" disabled>
+          <legend class="visually-hidden">Extension settings</legend>
+          <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+            <button
+              id="tab-rules"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="panel-rules"
+              data-section="rules"
+            >
+              Rules
+            </button>
+            <button
+              id="tab-connection"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-connection"
+              tabindex="-1"
+              data-section="connection"
+            >
+              Connection
+            </button>
+            <button
+              id="tab-preferences"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-preferences"
+              tabindex="-1"
+              data-section="preferences"
+            >
+              Preferences
+            </button>
+          </div>
+          <div class="settings-scroll">
+            <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules">
+              <h2>Choose what to hide</h2>
+              <p class="intro">
+                Tell TidyUp what to hide. Matching regions disappear; everything else stays.
+              </p>
+              <div class="starter-section">
+                <button id="add-starter-rules" type="button" aria-describedby="starter-rules-hint">
+                  <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z" /></svg
+                  >Add starter rules
+                </button>
+                <p id="starter-rules-hint" class="hint">
+                  Display ads, advertising backgrounds, and cookie overlays. Hiding a consent prompt
+                  does not accept or reject cookies.
+                </p>
+              </div>
+              <p id="rules-empty" class="empty-state">
+                No rules yet. Start with the basics above, or write your own below.
+              </p>
+              <ul id="rules" aria-label="Blocking rules"></ul>
+              <label for="new-rule">Add your own rule</label>
+              <textarea
+                id="new-rule"
+                rows="3"
+                maxlength="500"
+                placeholder="Hide sponsored posts and paid recommendations."
+                aria-describedby="rules-hint rule-notice"
+              ></textarea>
+              <div class="rule-actions">
+                <span id="rules-hint" class="hint">Up to 20 rules, 500 characters each.</span
+                ><button id="add-rule" type="button">Add rule</button>
+              </div>
+              <p id="rule-notice" role="status" aria-live="polite"></p>
+            </section>
+            <section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" hidden>
+              <h2>Connect your provider</h2>
+              <p class="intro">
+                Your provider checks page regions against your rules using your own API key.
+              </p>
+              <label for="provider">Provider</label>
+              <select id="provider" name="provider">
+                <option value="typesafe">TypeSafe direct</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+              <div id="model-field" class="field" hidden>
+                <label for="model">Model</label
+                ><select id="model" name="model">
+                  <option value="jev">Jev</option>
+                </select>
+              </div>
+              <p id="key-status" class="hint" role="status">Loading connection…</p>
+              <label for="api-key">API key</label>
+              <input
+                id="api-key"
+                name="api-key"
+                type="password"
+                autocomplete="new-password"
+                spellcheck="false"
+                placeholder="Enter your provider key"
+                aria-describedby="key-hint"
+              />
+              <p id="key-hint" class="hint">
+                Stored only in this browser. Leave blank to keep your saved key.
+              </p>
+              <button id="test" type="button" class="connection-test">
+                Save and test connection
+              </button>
+              <p class="hint">Tests a fixed example without sending page content.</p>
+              <button id="clear-key" type="button" class="text-button danger">
+                Clear this provider's key and save
+              </button>
+              <div class="privacy-note">
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Zm-4 9 3 3 5-6" />
+                </svg>
+                <p>
+                  Only candidate snippets and public hostnames go to your provider. Form contents
+                  and raw HTML stay out.
+                </p>
+              </div>
+            </section>
+            <section
+              id="panel-preferences"
+              role="tabpanel"
+              aria-labelledby="tab-preferences"
+              hidden
+            >
+              <label class="switch-row setting-row"
+                ><span
+                  ><strong>Enable TidyUp</strong
+                  ><small>Apply your saved rules while browsing.</small></span
+                ><input id="enabled" type="checkbox" role="switch"
+              /></label>
+              <div class="field">
+                <label for="activation">When to tidy</label
+                ><select id="activation" aria-describedby="activation-hint">
+                  <option value="automatic">Automatically on page load</option>
+                  <option value="manual">When I select Run now</option>
+                </select>
+                <p id="activation-hint" class="hint">
+                  Manual mode waits for Run now after navigation or saving settings.
+                </p>
+              </div>
+              <div class="confidence-row">
+                <label for="threshold">Minimum confidence</label>
+                <div class="number-field">
+                  <input
+                    id="threshold"
+                    name="threshold"
+                    type="number"
+                    min="90"
+                    max="100"
+                    step="0.1"
+                    required
+                    aria-describedby="threshold-hint"
+                  /><span>%</span>
+                </div>
+              </div>
+              <p id="threshold-hint" class="hint">
+                Higher values hide fewer regions. Uncertain results stay visible.
+              </p>
+              <label class="switch-row setting-row"
+                ><span
+                  ><strong>Remember decisions</strong
+                  ><small>Reuse results across visits.</small></span
+                ><input id="cache-enabled" type="checkbox" role="switch"
+              /></label>
+              <button id="clear-cache" type="button" class="text-button">
+                Clear all cached decisions
+              </button>
+              <p class="hint">Clears immediately, for every website.</p>
+              <label class="switch-row setting-row"
+                ><span
+                  ><strong>Debug mode</strong
+                  ><small>Outline candidates instead of hiding them.</small></span
+                ><input id="debug" type="checkbox" role="switch"
+              /></label>
+              <p class="hint">Red matches a rule, green stays, yellow is uncertain.</p>
+              <details class="excluded-sites">
+                <summary>Excluded websites</summary>
+                <label for="sites">One exact hostname per line</label
+                ><textarea
+                  id="sites"
+                  name="sites"
+                  rows="3"
+                  spellcheck="false"
+                  placeholder="www.example.com"
+                  aria-describedby="sites-hint"
+                ></textarea>
+                <p id="sites-hint" class="hint">
+                  No URLs or wildcards. Exclude private pages you do not want classified. Local and
+                  internal sites are always excluded.
+                </p>
+              </details>
+            </section>
+          </div>
+          <footer class="save-bar">
+            <p id="status" role="status" aria-live="polite"></p>
+            <p id="error" role="alert"></p>
+            <div>
+              <span>Changes apply when saved.</span
+              ><button type="submit" class="primary">Save settings</button>
+            </div>
+          </footer>
+        </fieldset>
+      </form>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

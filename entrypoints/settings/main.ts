@@ -4,6 +4,9 @@ import type { ExtensionMessage, Provider, PublicSettings, Settings } from '../..
 import { isRecord, parseSettings } from '../../lib/shared/validation';
 import { element, errorMessage, sendSettings } from '../../lib/ui/messages';
 import { readRules, setRules } from './rules';
+import { initializeNavigation } from './navigation';
+
+initializeNavigation();
 
 const form = element('#settings-form', HTMLFormElement);
 const controls = element('#controls', HTMLFieldSetElement);
