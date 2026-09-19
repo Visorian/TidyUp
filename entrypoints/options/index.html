@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TidyUp settings</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>TidyUp</h1>
+        <p>Choose what to hide with your own plain-language rules.</p>
+      </header>
+      <form id="settings-form">
+        <fieldset id="controls" disabled>
+          <legend class="visually-hidden">Extension settings</legend>
+          <section aria-labelledby="rules-heading">
+            <h2 id="rules-heading">Your rules</h2>
+            <p>
+              Describe when a page region should be hidden. Your rules are evaluated in parallel.
+              Content is hidden when any rule matches at your chosen confidence.
+            </p>
+            <p id="rules-empty">
+              No rules yet. Nothing will be blocked until you add and save a rule.
+            </p>
+            <ul id="rules" aria-label="Blocking rules"></ul>
+            <label for="new-rule">New rule</label>
+            <textarea
+              id="new-rule"
+              rows="3"
+              maxlength="500"
+              placeholder="Hide sponsored cards and paid advertising."
+              aria-describedby="rules-hint rule-notice"
+            ></textarea>
+            <p id="rules-hint" class="hint">
+              Up to 20 rules, 500 characters each. There are no built-in blocking rules. Add or
+              remove rules, then save settings to apply your changes.
+            </p>
+            <button id="add-rule" type="button">Add rule</button>
+            <p id="rule-notice" role="status" aria-live="polite"></p>
+          </section>
+          <section aria-labelledby="connection-heading">
+            <h2 id="connection-heading">Connection</h2>
+            <label for="provider">Provider</label>
+            <select id="provider" name="provider">
+              <option value="typesafe">TypeSafe direct</option>
+              <option value="openrouter">OpenRouter</option>
+            </select>
+            <div id="model-field" hidden>
+              <label for="model">Model</label>
+              <select id="model" name="model">
+                <option value="jev">Jev</option>
+              </select>
+            </div>
+            <p id="key-status" class="hint" role="status">Loading saved connection…</p>
+            <label for="api-key">API key</label>
+            <input
+              id="api-key"
+              name="api-key"
+              type="password"
+              autocomplete="new-password"
+              spellcheck="false"
+              aria-describedby="key-hint"
+            />
+            <p id="key-hint" class="hint">
+              Leave blank to keep the saved key. Each provider has its own key, stored locally in
+              this browser for personal use.
+            </p>
+            <button id="clear-key" type="button">Clear this provider's key and save</button>
+          </section>
+          <section aria-labelledby="blocking-heading">
+            <h2 id="blocking-heading">Blocking</h2>
+            <label for="activation">Activation</label>
+            <select id="activation" aria-describedby="activation-hint">
+              <option value="automatic">Automatic: run on page load</option>
+              <option value="manual">Manual: run from the popup</option>
+            </select>
+            <p id="activation-hint" class="hint">
+              Automatic mode starts after the page loads. Manual mode waits for Run now in the
+              popup, then follows new content on that page until you navigate or reveal it. Saving
+              settings resets Manual mode to waiting. Both modes require your saved rules.
+            </p>
+            <label class="check"><input id="enabled" type="checkbox" /> Enable TidyUp</label>
+            <div class="field">
+              <label for="threshold">Minimum confidence to hide content</label>
+              <div class="number-field">
+                <input
+                  id="threshold"
+                  name="threshold"
+                  type="number"
+                  min="90"
+                  max="100"
+                  step="0.1"
+                  required
+                  aria-describedby="threshold-hint"
+                /><span>%</span>
+              </div>
+              <p id="threshold-hint" class="hint">
+                90% is the default. Higher values hide fewer regions. Uncertain or failed decisions
+                leave content visible.
+              </p>
+            </div>
+            <label class="check"
+              ><input id="debug" type="checkbox" /> Debug mode: outline candidates instead of
+              hiding</label
+            >
+            <p class="hint">
+              Red marks matching content, green marks retained content, and yellow marks uncertain
+              decisions.
+            </p>
+          </section>
+          <section aria-labelledby="cache-heading">
+            <h2 id="cache-heading">Decision cache</h2>
+            <label class="check">
+              <input id="cache-enabled" type="checkbox" /> Reuse saved decisions across page reloads
+            </label>
+            <p class="hint">
+              Turn this off to evaluate content again. You can also disable caching for individual
+              sites in the extension popup. Changes to your rules require new decisions.
+            </p>
+            <button id="clear-cache" type="button">Clear cached decisions for all sites</button>
+            <p class="hint">Clearing takes effect immediately.</p>
+          </section>
+          <section aria-labelledby="sites-heading">
+            <h2 id="sites-heading">Excluded sites</h2>
+            <p>
+              Your saved rules apply according to your activation mode while enabled. Selected
+              candidate snippets and hostnames are sent to your provider for classification. Raw
+              HTML and form contents are excluded.
+            </p>
+            <p class="hint">
+              Exclude any private pages you do not want classified. Local and internal hostnames are
+              not supported.
+            </p>
+            <label for="sites">Disabled website hostnames, one per line</label>
+            <textarea
+              id="sites"
+              name="sites"
+              rows="5"
+              spellcheck="false"
+              placeholder="www.example.com"
+              aria-describedby="sites-hint"
+            ></textarea>
+            <p id="sites-hint" class="hint">
+              Use exact hostnames without URLs, paths, or wildcards. Subdomains need their own
+              entry. Leave empty to block on all supported websites. You can also disable a site
+              from the extension popup.
+            </p>
+          </section>
+          <div class="actions">
+            <button type="submit" class="primary">Save settings</button>
+            <button id="test" type="button">Save and test connection</button>
+          </div>
+          <p class="hint">The connection test sends a fixed example, with no page content.</p>
+        </fieldset>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+      <p id="error" role="alert"></p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

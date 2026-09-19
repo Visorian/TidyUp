@@ -1,0 +1,91 @@
+@import '../../lib/ui/style.css';
+
+body {
+  width: 360px;
+}
+main {
+  padding: 22px;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+h1 {
+  font-size: 21px;
+  margin: 0;
+}
+h2 {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  margin: 0 0 12px;
+}
+section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.consent {
+  font-size: 12px;
+  margin-bottom: 0;
+}
+.result {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 22px 0 4px;
+}
+.cache-control {
+  margin-top: 16px;
+}
+#clear-cache {
+  margin-top: 10px;
+}
+#rules-empty {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.result strong {
+  font-size: 32px;
+  line-height: 1;
+}
+#status {
+  font-size: 13px;
+  margin: 8px 0 18px;
+}
+.actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+#notice:empty {
+  display: none;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.provider-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+.provider-icon svg {
+  display: none;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.provider-icon[data-provider='openrouter'] svg[data-provider='openrouter'],
+.provider-icon[data-provider='typesafe'] svg[data-provider='typesafe'] {
+  display: block;
+}

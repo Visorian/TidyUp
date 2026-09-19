@@ -1,0 +1,39 @@
+{
+  "name": "tidyup",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt -b chrome --mv3",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "postinstall": "wxt prepare",
+    "build": "bun run build:chrome && bun run build:firefox",
+    "build:chrome": "wxt build -b chrome --mv3",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "zip": "bun run zip:chrome && bun run zip:firefox",
+    "zip:chrome": "wxt zip -b chrome --mv3",
+    "zip:firefox": "wxt zip -b firefox --mv3",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity error",
+    "lint:fix": "bun run lint --fix",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "test": "bun run build && vitest run",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
+    "oxlint-tsgolint": "^7.0.2002",
+    "typescript": "^7",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1",
+    "wxt": "^0.21.4"
+  },
+  "engines": {
+    "bun": ">=1.4.2",
+    "node": "^24.0.0 || >=26.0.0"
+  },
+  "packageManager": "bun@1.4.2"
+}

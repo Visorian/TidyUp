@@ -1,0 +1,11 @@
+node_modules/
+.wxt/
+.output/
+.playwright-cli/
+coverage/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+web-ext.config.ts

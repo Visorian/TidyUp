@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TidyUp</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>TidyUp</h1>
+        <div class="header-controls">
+          <span
+            id="provider"
+            class="provider-icon"
+            role="img"
+            tabindex="0"
+            aria-label="Loading provider"
+            title="Loading provider"
+          >
+            <svg data-provider="openrouter" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12h6m0 0 5-7h6M9 12l5 7h6M17 2l3 3-3 3m0 8 3 3-3 3" />
+            </svg>
+            <svg data-provider="typesafe" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 3 8 3v6c0 4-4 7-8 9-4-2-8-5-8-9V6l8-3Zm-4 9 3 3 5-6" />
+            </svg>
+          </span>
+          <button id="settings" type="button" class="text-button">Settings</button>
+        </div>
+      </header>
+      <p id="connection" class="muted" hidden>Add an API key in Settings to start.</p>
+      <fieldset id="controls" disabled>
+        <legend class="visually-hidden">Blocking controls</legend>
+        <label class="check"><input id="enabled" type="checkbox" /> Enable TidyUp</label>
+        <p id="activation" class="muted"></p>
+        <p id="rules-empty" hidden>
+          No rules yet. Open Settings to add rules. Nothing will be blocked.
+        </p>
+        <section aria-labelledby="host">
+          <h2 id="host">Current website</h2>
+          <label class="check"><input id="site" type="checkbox" /> Apply rules on this site</label>
+          <p class="muted consent">Turn this off to exclude this site in either activation mode.</p>
+          <label class="check cache-control">
+            <input id="cache-site" type="checkbox" aria-describedby="cache-hint" /> Cache this site
+          </label>
+          <p id="cache-hint" class="muted consent"></p>
+          <button id="clear-cache" type="button">Clear this site's cached decisions</button>
+        </section>
+        <p class="result"><strong id="blocked">0</strong> hidden in the main page</p>
+        <p id="status" role="status">Loading page status…</p>
+        <div class="actions">
+          <button id="reveal" type="button" disabled>Show blocked content</button>
+          <button id="rescan" type="button" disabled>Scan again</button>
+        </div>
+      </fieldset>
+      <p id="notice" role="alert"></p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

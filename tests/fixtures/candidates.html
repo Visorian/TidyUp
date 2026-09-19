@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TidyUp candidate fixture</title>
+    <style>
+      body {
+        font: 16px system-ui;
+        margin: 24px;
+      }
+      .card,
+      aside,
+      iframe {
+        display: block;
+        border: 1px solid gray;
+        margin: 16px 0;
+        padding: 16px;
+      }
+      #image-link {
+        display: block;
+        width: 160px;
+        height: 600px;
+      }
+      .collapsed {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Candidate extraction fixture</h1>
+    <p>
+      After the image promotion is hidden, repeated markup updates should leave it hidden. Reusing
+      its container for ordinary text should restore it for classification.
+    </p>
+    <button id="mutate-presentation" type="button">Repeat harmless markup updates</button>
+    <button id="reuse-presentation" type="button">Replace with ordinary content</button>
+    <main id="essential-main">
+      <a id="image-link" href="https://store.example.org/shoes">
+        <img
+          width="160"
+          height="600"
+          alt="Sponsored display promotion: buy walking shoes"
+          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='600'%3E%3Crect width='160' height='600' fill='%230b5965'/%3E%3C/svg%3E"
+        />
+      </a>
+      <div id="feed-wrapper">
+        <article id="sponsored-card" class="card">
+          <span>Sponsored</span>
+          <h2>A better pair of walking shoes</h2>
+          <a href="https://store.example.org/shoes?token=URL_QUERY_SECRET#private">Shop now</a>
+          <span hidden>HIDDEN_STATE_SECRET</span>
+          <span style="display: none">CSS_HIDDEN_SECRET</span>
+        </article>
+        <article id="organic-card" class="card">
+          <h2>My favorite walking route</h2>
+          <p>An ordinary post about an afternoon outdoors.</p>
+        </article>
+        <article id="partner-card" class="card">
+          <span>Partner content</span>
+          <h2>Walking shoes for the season</h2>
+          <a href="https://store.example.org/season">View offer</a>
+        </article>
+        <article id="rerender-card" class="card">
+          <span>Sponsored</span>
+          <h2>Original paid recommendation</h2>
+          <a href="https://store.example.org/original">Shop now</a>
+        </article>
+      </div>
+      <div id="already-blocked" class="card collapsed">
+        Sponsored content already hidden by another blocker.
+        <a href="https://store.example.org/hidden">Shop now</a>
+      </div>
+      <form id="private-form" class="card">
+        Sponsored account settings
+        <input aria-label="Password" type="password" value="PASSWORD_VALUE_SECRET" />
+        <textarea>TEXTAREA_VALUE_SECRET</textarea>
+        <p>FORM_CONTENT_SECRET</p>
+      </form>
+      <div id="private-editor" class="card" contenteditable="true">
+        Sponsored EDITOR_CONTENT_SECRET
+        <a href="https://store.example.org/editor">Shop now</a>
+      </div>
+      <div id="contains-private-form" class="card">
+        <span>Sponsored settings with private form</span>
+        <a href="https://store.example.org/account">Shop now</a>
+        <form><input value="NESTED_FORM_SECRET" /></form>
+      </div>
+      <aside id="redaction-card" class="card">
+        Sponsored offer. Contact private@example.org. Visit
+        https://store.example.org/offer?token=VISIBLE_URL_SECRET.
+        <a href="https://store.example.org/offer?secret=LINK_SECRET">Shop now</a>
+      </aside>
+      <div id="shadow-host"></div>
+      <div id="slotted-form-host">
+        <div id="slotted-private-card" class="card">
+          Sponsored slotted form contents: SLOTTED_FORM_SECRET.
+          <a href="https://store.example.org/private">Shop now</a>
+        </div>
+      </div>
+      <div id="unassigned-host">
+        <div id="unassigned-private-card" class="card">
+          Sponsored non-rendered light DOM: UNASSIGNED_LIGHT_SECRET.
+          <a href="https://store.example.org/unassigned">Shop now</a>
+        </div>
+      </div>
+      <div id="contains-shadow-form" class="card">
+        Sponsored account promotion with a private form in its shadow tree.
+        <div id="shadow-form-host"></div>
+      </div>
+      <div id="contains-closed-details" class="card">
+        Sponsored promotion with collapsed private content.
+        <details>
+          <summary>Private account details</summary>
+          CLOSED_DETAILS_SECRET
+          <div id="closed-details-card">Sponsored hidden account: CLOSED_DESCENDANT_SECRET.</div>
+        </details>
+      </div>
+    </main>
+    <script type="module">
+      document.querySelector('#mutate-presentation')?.addEventListener('click', () => {
+        const image = document.querySelector('#image-link img');
+        for (let frame = 0; frame < 100; frame++) {
+          image?.setAttribute('class', `frame-${frame}`);
+        }
+      });
+      document.querySelector('#reuse-presentation')?.addEventListener('click', () => {
+        const link = document.querySelector('#image-link');
+        if (link !== null) {
+          link.removeAttribute('href');
+          link.textContent = 'An ordinary journal entry about an afternoon walk through the park.';
+        }
+      });
+      const host = document.querySelector('#shadow-host');
+      if (host !== null) {
+        const root = host.attachShadow({ mode: 'open' });
+        const card = document.createElement('article');
+        card.id = 'shadow-card';
+        card.textContent = 'Sponsored: commercial placement in an open shadow root.';
+        const link = document.createElement('a');
+        link.href = 'https://store.example.org/shadow';
+        link.textContent = 'Shop now';
+        card.append(link);
+        root.append(card);
+      }
+      const slottedHost = document.querySelector('#slotted-form-host');
+      if (slottedHost !== null) {
+        const root = slottedHost.attachShadow({ mode: 'open' });
+        const form = document.createElement('form');
+        form.append(document.createElement('slot'));
+        root.append(form);
+      }
+      const unassignedHost = document.querySelector('#unassigned-host');
+      if (unassignedHost !== null) {
+        const root = unassignedHost.attachShadow({ mode: 'open' });
+        root.textContent = 'Visible shadow content, without a slot.';
+      }
+      const formHost = document.querySelector('#shadow-form-host');
+      if (formHost !== null) {
+        const root = formHost.attachShadow({ mode: 'open' });
+        const form = document.createElement('form');
+        form.textContent = 'SHADOW_FORM_SECRET';
+        root.append(form);
+      }
+    </script>
+  </body>
+</html>

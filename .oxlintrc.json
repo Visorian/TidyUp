@@ -1,0 +1,94 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "vitest", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error"
+  },
+  "options": {
+    "typeAware": true
+  },
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": [".wxt/**", ".output/**", ".playwright-cli/**", "coverage/**"],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-type-assertion": "error",
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "ignoreVoid": false
+      }
+    ],
+    "typescript/no-misused-promises": "error",
+    "typescript/strict-boolean-expressions": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": true,
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ],
+    "eslint/eqeqeq": ["error", "always"],
+    "eslint/no-console": "error",
+    "eslint/no-debugger": "error",
+    "eslint/no-eval": "error",
+    "eslint/no-new-func": "error",
+    "typescript/prefer-readonly-parameter-types": [
+      "error",
+      {
+        "allow": [
+          {
+            "from": "lib",
+            "name": [
+              "Node",
+              "Element",
+              "HTMLElement",
+              "HTMLInputElement",
+              "HTMLSelectElement",
+              "HTMLTextAreaElement",
+              "HTMLButtonElement",
+              "HTMLFormElement",
+              "Document",
+              "TreeWalker",
+              "ShadowRoot",
+              "MutationRecord",
+              "Event",
+              "SubmitEvent",
+              "IdleDeadline",
+              "AbortSignal",
+              "Lock"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["entrypoints/**/*.ts", "lib/**/*.ts"],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["*.config.ts", "tests/**/*.ts"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

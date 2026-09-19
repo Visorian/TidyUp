@@ -1,0 +1,117 @@
+@import '../../lib/ui/style.css';
+
+body {
+  background: #f4f7fc;
+}
+main {
+  max-width: 680px;
+  margin: 40px auto;
+  padding: 32px 40px;
+  background: #fff;
+  border-top: 5px solid var(--accent);
+}
+header {
+  margin-bottom: 28px;
+}
+h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+header p {
+  margin: 0;
+  color: var(--muted);
+}
+h2 {
+  font-size: 19px;
+  margin: 0 0 18px;
+}
+section {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+section > label:not(.check),
+.field > label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: 600;
+}
+input:not([type='checkbox']),
+select,
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #9eb2ca;
+  border-radius: 4px;
+  color: inherit;
+  background: #fff;
+}
+textarea {
+  resize: vertical;
+  min-height: 116px;
+}
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 18px;
+}
+.field {
+  margin: 24px 0;
+}
+.number-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.number-field input {
+  width: 120px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+}
+#status {
+  color: #22552c;
+}
+#rules {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+#rules li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+#rules span {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+#rules button {
+  flex-shrink: 0;
+}
+#new-rule {
+  min-height: 80px;
+}
+#rule-notice:empty {
+  display: none;
+}
+#error:empty,
+#status:empty {
+  display: none;
+}
+@media (max-width: 640px) {
+  main {
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .actions {
+    flex-direction: column;
+  }
+}
