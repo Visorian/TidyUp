@@ -12,6 +12,7 @@ const MAX_PAGE_ENTRIES = 64;
 
 export interface ReplayEntry {
   readonly selector: string;
+  readonly kind?: 'ad-slot' | undefined;
   readonly fingerprintHash: string;
   readonly result: {
     readonly probability: number;
@@ -87,6 +88,7 @@ function parseEntry(value: unknown): StoredEntry | null {
   if (
     !isRecord(value) ||
     !validSelector(value['selector']) ||
+    (value['kind'] !== undefined && value['kind'] !== 'ad-slot') ||
     !validHash(value['fingerprintHash']) ||
     !validHash(value['page']) ||
     !validHash(value['site']) ||
@@ -103,6 +105,7 @@ function parseEntry(value: unknown): StoredEntry | null {
   if (scores === null || Math.max(...scores) !== result['probability']) return null;
   return {
     selector: value['selector'],
+    ...(value['kind'] === 'ad-slot' ? { kind: 'ad-slot' as const } : {}),
     fingerprintHash: value['fingerprintHash'],
     page: value['page'],
     site: value['site'],
@@ -125,6 +128,7 @@ export function parseReplaySnapshot(value: unknown): ReplaySnapshot | null {
     if (
       !isRecord(entry) ||
       !validSelector(entry['selector']) ||
+      (entry['kind'] !== undefined && entry['kind'] !== 'ad-slot') ||
       !validHash(entry['fingerprintHash']) ||
       !isRecord(entry['result'])
     )
@@ -134,6 +138,7 @@ export function parseReplaySnapshot(value: unknown): ReplaySnapshot | null {
     if (scores === null || Math.max(...scores) !== result['probability']) return null;
     entries.push({
       selector: entry['selector'],
+      ...(entry['kind'] === 'ad-slot' ? { kind: 'ad-slot' as const } : {}),
       fingerprintHash: entry['fingerprintHash'],
       result: { probability: Math.max(...scores), ruleProbabilities: scores },
     });
@@ -176,7 +181,12 @@ export async function getReplayEntries(
           entry.result.ruleProbabilities.length === activeRules(settings).length,
       )
       .slice(-MAX_PAGE_ENTRIES)
-      .map(({ selector, fingerprintHash, result }) => ({ selector, fingerprintHash, result })),
+      .map(({ selector, fingerprintHash, result, kind }) => ({
+        selector,
+        fingerprintHash,
+        result,
+        kind,
+      })),
   };
 }
 
@@ -187,10 +197,15 @@ export async function rememberReplay(
   candidate: AdCandidate,
   result: CandidateClassification,
   epoch: string,
+  slotFingerprint?: string,
 ): Promise<void> {
   const host = pageHost(pageUrl, settings);
   const scores = parseRuleProbabilities(result.ruleProbabilities);
   if (
+    (slotFingerprint !== undefined &&
+      (slotFingerprint.length === 0 ||
+        slotFingerprint.length > 1000 ||
+        candidate.kind !== undefined)) ||
     host === null ||
     host !== candidate.pageHost ||
     !validSelector(selector) ||
@@ -205,7 +220,7 @@ export async function rememberReplay(
     hash(pageUrl),
     hash(host),
     hash(JSON.stringify([POLICY_VERSION, settings])),
-    hashReplayFingerprint(candidate),
+    slotFingerprint === undefined ? hashReplayFingerprint(candidate) : hash(slotFingerprint),
   ]);
   await storeReplay(
     {
@@ -214,6 +229,7 @@ export async function rememberReplay(
       policy,
       selector,
       fingerprintHash,
+      ...(slotFingerprint === undefined ? {} : { kind: 'ad-slot' as const }),
       timestamp: Date.now(),
       result: { probability: result.probability, ruleProbabilities: scores },
     },

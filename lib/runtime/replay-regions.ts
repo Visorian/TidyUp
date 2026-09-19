@@ -1,3 +1,4 @@
+import { adSlotFingerprint, findAdSlot } from '../blocking/ad-slot';
 import { extractCandidate } from '../candidates/extract';
 import { candidateFingerprint } from '../candidates/fingerprint';
 import { parseReplaySnapshot, type ReplayEntry } from '../classifier/replay-cache';
@@ -84,9 +85,21 @@ export class ReplayRegions {
     this.checked = new WeakMap();
   }
 
-  remember(element: Element, candidate: AdCandidate, generation: number): void {
+  remember(
+    element: Element,
+    candidate: AdCandidate,
+    generation: number,
+    target: Element = element,
+  ): void {
     if (this.epoch === null) return;
-    const selector = regionSelector(element);
+    const slot =
+      candidate.kind === undefined &&
+      element instanceof HTMLElement &&
+      target instanceof HTMLElement
+        ? findAdSlot(element, target)
+        : null;
+    const slotFingerprint = slot === null ? null : adSlotFingerprint(slot);
+    const selector = regionSelector(slot ?? element);
     if (selector === null) return;
     void send({
       type: 'REMEMBER_REGION',
@@ -94,6 +107,7 @@ export class ReplayRegions {
       generation,
       candidates: [candidate],
       selector,
+      ...(slotFingerprint === null ? {} : { slotFingerprint }),
       epoch: this.epoch,
     }).catch(() => {});
   }
@@ -111,9 +125,23 @@ export class ReplayRegions {
       const element = elements[0];
       if (element === undefined || this.options.hidden(element) || this.pending.has(element))
         continue;
-      const candidate = extractCandidate(element, 'replay', location.hostname);
+      const slotFingerprint = entry.kind === 'ad-slot' ? adSlotFingerprint(element) : null;
+      const candidate: AdCandidate | null =
+        entry.kind === 'ad-slot'
+          ? slotFingerprint === null
+            ? null
+            : {
+                id: 'replay',
+                kind: 'ad-slot',
+                tag: element.localName,
+                text: slotFingerprint,
+                labels: ['advertisement'],
+                linkHosts: [],
+                pageHost: location.hostname,
+              }
+          : extractCandidate(element, 'replay', location.hostname);
       if (candidate === null) continue;
-      const fingerprint = candidateFingerprint(candidate);
+      const fingerprint = slotFingerprint ?? candidateFingerprint(candidate);
       if (this.checked.get(element) === fingerprint) continue;
       this.pending.add(element);
       const version = this.version;

@@ -5,6 +5,7 @@ import { runClassification, runCacheLookup } from '../lib/classifier/service';
 import { clearReplayCache, getReplayEntries, rememberReplay } from '../lib/classifier/replay-cache';
 import { parseCandidates } from '../lib/classifier/validate';
 import { publicSettings, readSettings, restrictStorage } from '../lib/config/settings';
+import type { AdCandidate, Settings } from '../lib/shared/types';
 import { isPublicHost, isRecord, isSiteEnabled, parseSettings } from '../lib/shared/validation';
 
 interface Sender {
@@ -170,26 +171,37 @@ async function handlePage(
   const candidates = parseCandidates(message['candidates'], host);
   if (message['type'] === 'GET_REPLAY')
     return { ok: true, settings, snapshot: await getReplayEntries(sender.url, settings) };
-  if (message['type'] === 'REMEMBER_REGION') {
-    const selector = message['selector'];
-    const epoch = message['epoch'];
-    const candidate = candidates?.length === 1 ? candidates[0] : undefined;
-    if (
-      candidate === undefined ||
-      typeof selector !== 'string' ||
-      selector.length > 1000 ||
-      typeof epoch !== 'string'
-    )
-      return { ok: false, error: 'Invalid remembered region.' };
-    const cached = await runCacheLookup([candidate], host);
-    const result = cached.ok ? cached.results[0] : undefined;
-    if (result !== undefined)
-      await rememberReplay(sender.url, settings, selector, candidate, result, epoch);
-    return { ok: true };
-  }
+  if (message['type'] === 'REMEMBER_REGION')
+    return handleRemember(message, sender.url, settings, candidates);
   return candidates === null
     ? { ok: false, error: 'Invalid candidate payload.' }
     : message['type'] === 'LOOKUP_CACHE'
       ? runCacheLookup(candidates, host)
       : runClassification(candidates, host);
+}
+
+async function handleRemember(
+  message: Readonly<Record<string, unknown>>,
+  pageUrl: string,
+  settings: Settings,
+  candidates: readonly AdCandidate[] | null,
+): Promise<unknown> {
+  const selector = message['selector'];
+  const epoch = message['epoch'];
+  const slotFingerprint = message['slotFingerprint'];
+  const candidate = candidates?.length === 1 ? candidates[0] : undefined;
+  if (
+    candidate === undefined ||
+    typeof selector !== 'string' ||
+    selector.length > 1000 ||
+    typeof epoch !== 'string' ||
+    (slotFingerprint !== undefined &&
+      (typeof slotFingerprint !== 'string' || slotFingerprint.length > 1000))
+  )
+    return { ok: false, error: 'Invalid remembered region.' };
+  const cached = await runCacheLookup([candidate], candidate.pageHost);
+  const result = cached.ok ? cached.results[0] : undefined;
+  if (result !== undefined)
+    await rememberReplay(pageUrl, settings, selector, candidate, result, epoch, slotFingerprint);
+  return { ok: true };
 }

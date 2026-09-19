@@ -3,6 +3,7 @@ import { extractSpecialCandidate, specialPresentationFingerprint } from '../cand
 import { isSafeCandidateBoundary } from '../candidates/visibility';
 import type { AdCandidate } from '../shared/types';
 import { findAdContainer, isAdContainer } from './ad-container';
+import { adSlotFingerprint } from './ad-slot';
 import { adBackgroundColorTarget, adBackgroundVariables } from './background-color';
 
 interface StyleChange {
@@ -55,6 +56,7 @@ function restoreStyle(change: StyleChange): void {
 }
 
 function fingerprint(element: Element, kind: AdCandidate['kind']): string | null {
+  if (kind === 'ad-slot') return adSlotFingerprint(element);
   return kind === undefined
     ? presentationFingerprint(element)
     : specialPresentationFingerprint(element, kind);
@@ -101,14 +103,20 @@ export class PresentationStore {
       this.entries.size >= 512 ||
       (kind === undefined
         ? !safePresentation(element)
-        : extractSpecialCandidate(element, 'presentation', element.ownerDocument.location.hostname)
-            ?.kind !== kind)
+        : kind === 'ad-slot'
+          ? adSlotFingerprint(element) === null
+          : extractSpecialCandidate(
+              element,
+              'presentation',
+              element.ownerDocument.location.hostname,
+            )?.kind !== kind)
     )
       return false;
     if (!debug && probability < threshold) return false;
     const currentFingerprint = fingerprint(element, kind);
     if (currentFingerprint === null) return false;
-    const target = !debug && kind === undefined ? findAdContainer(element) : element;
+    const target =
+      !debug && (kind === undefined || kind === 'ad-slot') ? findAdContainer(element) : element;
     const property = debug ? 'outline' : kind === 'background' ? 'background-image' : 'display';
     const color = probability >= threshold ? '#dc2626' : probability <= 0.1 ? '#16a34a' : '#ca8a04';
     const background = debug ? null : adBackgroundColorTarget(element, target, kind);

@@ -11,8 +11,10 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn<(message: ExtensionMessage) => Promise<unknown>>(),
+  slot: vi.fn<(element: Element) => string | null>(),
   extract: vi.fn<(element: Element, id: string, host: string) => AdCandidate | null>(),
 }));
+vi.mock('../lib/blocking/ad-slot', () => ({ adSlotFingerprint: mocks.slot }));
 vi.mock('../lib/runtime/messages', () => ({ send: mocks.send }));
 vi.mock('../lib/candidates/extract', () => ({ extractCandidate: mocks.extract }));
 vi.mock('wxt/browser', () => ({ browser: {} }));
@@ -56,6 +58,7 @@ beforeEach(async () => {
     },
   );
   active = true;
+  mocks.slot.mockReset();
   apply.mockReset();
   observe.mockReset();
   disconnect.mockReset();
@@ -186,4 +189,39 @@ it('disconnects the observer and document events when stopped', async () => {
   mutation();
   expect(mocks.extract).not.toHaveBeenCalled();
   expect(disconnect).toHaveBeenCalledOnce();
+});
+
+it('replays an empty learned slot without requiring extractable creative content', async () => {
+  const signature = JSON.stringify(['div', 'sidebar', ['ad-slot']]);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(signature));
+  fingerprintHash = Buffer.from(digest).toString('hex');
+  mocks.extract.mockReturnValue(null);
+  mocks.slot.mockReturnValue(signature);
+  mocks.send.mockResolvedValue({
+    settings,
+    snapshot: {
+      epoch: '',
+      entries: [
+        {
+          selector: '#sidebar',
+          kind: 'ad-slot',
+          fingerprintHash,
+          result: { probability: 0.99, ruleProbabilities: [0.99] },
+        },
+      ],
+    },
+  });
+  await replay.start(settings, 1);
+  await settle();
+  expect(apply).toHaveBeenCalledWith(
+    elements[0],
+    expect.objectContaining({ kind: 'ad-slot', text: signature }),
+    expect.objectContaining({ probability: 0.99 }),
+  );
+  expect(mocks.extract).not.toHaveBeenCalled();
+  apply.mockClear();
+  mocks.slot.mockReturnValue(null);
+  mutation();
+  await settle();
+  expect(apply).not.toHaveBeenCalled();
 });

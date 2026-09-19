@@ -1,5 +1,6 @@
 /* oxlint-disable import/max-dependencies, eslint/max-lines -- Keep bounded hidden-decision replay with the page presentation lifecycle. */
 import { browser } from 'wxt/browser';
+import { adSlotFingerprint } from '../blocking/ad-slot';
 import { PresentationStore, watchPresentation } from '../blocking/hide';
 import { enumerateElements, extractCandidate } from '../candidates/extract';
 import { CandidateReadCache } from '../candidates/read-cache';
@@ -94,11 +95,12 @@ export class PageSession {
         {
           element,
           candidate,
-          fingerprint: candidateFingerprint(candidate),
+          fingerprint:
+            candidate.kind === 'ad-slot' ? candidate.text : candidateFingerprint(candidate),
           generation: this.generation,
         },
         result,
-        false,
+        candidate.kind !== 'ad-slot',
       );
     },
   });
@@ -358,6 +360,8 @@ export class PageSession {
       this.presentations.has(pending.element)
     )
       return false;
+    if (pending.candidate.kind === 'ad-slot')
+      return adSlotFingerprint(pending.element) === pending.fingerprint;
     const current = extractCandidate(pending.element, pending.candidate.id, location.hostname);
     return current !== null && candidateFingerprint(current) === pending.fingerprint;
   }
@@ -370,7 +374,13 @@ export class PageSession {
     const { threshold, debug } = this.configuration.settings;
     const { element, candidate } = pending;
     if (this.presentations.apply(element, result.probability, threshold, debug, candidate.kind)) {
-      if (remember) this.replay.remember(element, candidate, this.generation);
+      if (remember)
+        this.replay.remember(
+          element,
+          candidate,
+          this.generation,
+          this.presentations.target(element),
+        );
       this.metrics.hidden++;
       this.hiddenDecisions.set(element, {
         pending,

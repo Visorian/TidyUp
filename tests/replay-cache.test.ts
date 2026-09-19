@@ -131,3 +131,16 @@ it('rejects untrusted malformed responses and nonblocking decisions', async () =
   await rememberReplay(url, settings, '#ad', { ...candidate, pageHost: 'other.org' }, result, '');
   expect(storage.set).not.toHaveBeenCalled();
 });
+
+it('persists slot identity separately from changing creative content', async () => {
+  const slotFingerprint = JSON.stringify(['div', 'sidebar', ['ad-slot']]);
+  await rememberReplay(url, settings, '#sidebar', candidate, result, '', slotFingerprint);
+  const snapshot = await getReplayEntries(url, settings);
+  expect(snapshot.entries).toHaveLength(1);
+  expect(snapshot.entries[0]).toMatchObject({ selector: '#sidebar', kind: 'ad-slot' });
+  expect(snapshot.entries[0]?.fingerprintHash).not.toBe(await hashReplayFingerprint(candidate));
+  expect(parseReplaySnapshot(snapshot)).toEqual(snapshot);
+  expect(JSON.stringify([...storage.values.values()])).not.toContain(slotFingerprint);
+  await clearReplayCache(candidate.pageHost);
+  expect((await getReplayEntries(url, settings)).entries).toEqual([]);
+});

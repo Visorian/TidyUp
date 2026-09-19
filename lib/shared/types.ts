@@ -33,7 +33,7 @@ export interface PublicSettings {
 
 export interface AdCandidate {
   readonly id: string;
-  readonly kind?: 'consent' | 'background';
+  readonly kind?: 'consent' | 'background' | 'ad-slot';
   readonly tag: string;
   readonly text: string;
   readonly labels: readonly string[];
@@ -111,6 +111,7 @@ export type ExtensionMessage =
       readonly generation: number;
       readonly candidates: readonly AdCandidate[];
       readonly selector: string;
+      readonly slotFingerprint?: string;
       readonly epoch: string;
     }
   | { readonly type: 'SETTINGS_CHANGED' }
