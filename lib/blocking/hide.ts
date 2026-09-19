@@ -197,6 +197,31 @@ export class PresentationStore {
     }
   }
 
+  private updateBackground(entry: Presentation, background: HTMLElement | null): void {
+    if (!entry.debug) {
+      const variables = adBackgroundVariables(entry.element, entry.target).filter(
+        (variable) =>
+          !entry.changes.some(
+            (change) =>
+              change.element === entry.element.ownerDocument.body && change.property === variable,
+          ),
+      );
+      if (variables.length > 0 || background !== null)
+        this.entries.set(entry.element, {
+          ...entry,
+          changes: [
+            ...entry.changes.filter(
+              (change) => change.element !== background || change.property !== 'background-color',
+            ),
+            ...(background === null ? [] : [changeStyle(background, 'background-color', '')]),
+            ...variables.map((variable) =>
+              changeStyle(entry.element.ownerDocument.body, variable, 'inherit'),
+            ),
+          ],
+        });
+    }
+  }
+
   restoreNext():
     | { readonly restored: boolean; readonly root: Element | null; readonly element: Element }
     | undefined {
@@ -205,6 +230,10 @@ export class PresentationStore {
     this.pending.delete(element);
     const entry = this.entries.get(element);
     if (entry === undefined) return { restored: false, root: null, element };
+    const background =
+      entry.debug || entry.kind === 'background'
+        ? null
+        : adBackgroundColorTarget(entry.element, entry.target, entry.kind);
     if (
       element.isConnected &&
       (entry.kind !== undefined || safePresentation(element)) &&
@@ -212,29 +241,12 @@ export class PresentationStore {
       fingerprint(element, entry.kind) === entry.fingerprint &&
       entry.changes.every(
         (change) =>
-          change.element.style.getPropertyValue(change.property) === change.applied &&
-          change.element.style.getPropertyPriority(change.property) === change.appliedPriority,
+          (change.element === background && change.property === 'background-color') ||
+          (change.element.style.getPropertyValue(change.property) === change.applied &&
+            change.element.style.getPropertyPriority(change.property) === change.appliedPriority),
       )
     ) {
-      if (!entry.debug) {
-        const variables = adBackgroundVariables(entry.element, entry.target).filter(
-          (variable) =>
-            !entry.changes.some(
-              (change) =>
-                change.element === element.ownerDocument.body && change.property === variable,
-            ),
-        );
-        if (variables.length > 0)
-          this.entries.set(element, {
-            ...entry,
-            changes: [
-              ...entry.changes,
-              ...variables.map((variable) =>
-                changeStyle(element.ownerDocument.body, variable, 'inherit'),
-              ),
-            ],
-          });
-      }
+      this.updateBackground(entry, background);
       return { restored: false, root: null, element };
     }
     const root = entry.target.isConnected ? entry.target : element.isConnected ? element : null;

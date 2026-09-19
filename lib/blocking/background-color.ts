@@ -44,7 +44,7 @@ export function adBackgroundColorTarget(
 ): HTMLElement | null {
   if (kind === 'background')
     return element.style.getPropertyValue('background-color') === '' ? null : element;
-  if (kind !== undefined) return null;
+  if (kind !== undefined && kind !== 'ad-slot') return null;
   const body = element.ownerDocument.body;
   if (!(body instanceof HTMLElement) || body === element || body === target) return null;
   const color = body.style.getPropertyValue('background-color');

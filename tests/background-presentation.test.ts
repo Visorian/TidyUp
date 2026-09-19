@@ -227,3 +227,19 @@ it('neutralizes an ad-owned page-background variable and restores it when reveal
   store.restoreAll();
   expect(body.style.getPropertyValue('--site-background')).toBe('');
 });
+
+it('cleans a matching body color written after hiding and reapplied by the ad script', () => {
+  const { store, ad, wrapper, body } = fixture();
+  body.style.removeProperty('background-color');
+  expect(store.apply(ad, 0.99, 0.9, false)).toBe(true);
+  for (let write = 0; write < 2; write++) {
+    body.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
+    store.queueChanges([body]);
+    expect(store.restoreNext()?.restored).toBe(false);
+    expect(body.style.getPropertyValue('background-color')).toBe('');
+    expect(wrapper.style.getPropertyValue('display')).toBe('none');
+  }
+  store.restoreAll();
+  expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
+  expect(body.style.getPropertyPriority('background-color')).toBe('important');
+});
