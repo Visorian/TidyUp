@@ -13,6 +13,9 @@ vi.mock('../lib/blocking/background-color', () => ({
 
 class FixtureElement {
   readonly tagName = 'DIV';
+  get localName(): string {
+    return this.tagName.toLowerCase();
+  }
   id = '';
   isConnected = true;
   parentElement: FixtureElement | null = null;
@@ -113,6 +116,15 @@ it('remembers the closest identified slot inside the validated presentation boun
   expect(findAdSlot(creative, wrapper)).toBe(inner);
   expect(findAdSlot(creative, element())).toBeNull();
   expect(adSlotFingerprint(element())).toBeNull();
+});
+
+it('identifies a placement wrapped in the site own custom element', () => {
+  const wrapper = element('a-sticky-ad');
+  const inner = slot(wrapper);
+  const creative = element('iframe', inner);
+  wrapper.id = 'HEI_D_Right';
+  expect(adSlotFingerprint(wrapper)).toBe(JSON.stringify(['a-sticky-ad', ['ad']]));
+  expect(findAdSlot(creative, wrapper)).toBe(wrapper);
 });
 
 it('keeps one slot identity across creative states and generated identifiers', () => {

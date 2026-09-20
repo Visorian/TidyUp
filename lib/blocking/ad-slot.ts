@@ -8,6 +8,11 @@ const SLOT_WORD =
 // Identifiers carrying a generated counter differ on every load and cannot anchor a locator.
 const GENERATED = /\d{4,}|[\da-f]{8,}/iu;
 
+// Sites wrap placements in their own custom elements, which always carry a dash in the tag name.
+export function isSlotElement(element: Element): boolean {
+  return element.matches('div,section,aside,ins') || element.localName.includes('-');
+}
+
 function slotWords(value: string): string[] {
   return value
     .replaceAll(/([a-z])([A-Z])/gu, '$1 $2')
@@ -22,7 +27,7 @@ export function isStableIdentifier(id: string): boolean {
 
 export function adSlotFingerprint(element: Element): string | null {
   if (
-    !element.matches('div,section,aside,ins') ||
+    !isSlotElement(element) ||
     element.matches(ESSENTIAL) ||
     !isSafeCandidateBoundary(element) ||
     element.querySelector(ESSENTIAL) !== null
@@ -31,7 +36,9 @@ export function adSlotFingerprint(element: Element): string | null {
   // Only the advertising words survive, so a slot keeps its identity across creatives and loads.
   const words = [
     ...new Set(
-      slotWords(`${element.getAttribute('id') ?? ''} ${element.getAttribute('class') ?? ''}`),
+      slotWords(
+        `${element.localName} ${element.getAttribute('id') ?? ''} ${element.getAttribute('class') ?? ''}`,
+      ),
     ),
   ].toSorted();
   if (words.length === 0) return null;

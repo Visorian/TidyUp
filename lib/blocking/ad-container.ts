@@ -1,6 +1,6 @@
 import { collectContentFeatures, isAdvertisementLabel } from '../candidates/features';
 import { INERT_ELEMENTS, isSafeCandidateBoundary } from '../candidates/visibility';
-import { adSlotFingerprint } from './ad-slot';
+import { adSlotFingerprint, isSlotElement } from './ad-slot';
 
 const CONTAINERS = 'div,section,aside,ins';
 const EMPTY_ELEMENTS = `${CONTAINERS},span`;
@@ -27,7 +27,7 @@ export function isAdContainer(container: HTMLElement, element: HTMLElement): boo
   for (let depth = 0; depth < MAX_DEPTH; depth++) {
     if (
       !(ancestor instanceof HTMLElement) ||
-      !ancestor.matches(CONTAINERS) ||
+      !isSlotElement(ancestor) ||
       ancestor.matches(INTERACTIVE)
     )
       return false;

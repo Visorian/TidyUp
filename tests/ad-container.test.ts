@@ -13,6 +13,8 @@ vi.mock('../lib/candidates/features', async (importOriginal) => ({
 vi.mock('../lib/blocking/ad-slot', () => ({
   adSlotFingerprint: (element: Element) =>
     element.getAttribute('test-slot') === 'true' ? '["div",["ad"]]' : null,
+  isSlotElement: (element: Element) =>
+    element.matches('div,section,aside,ins') || (element.getAttribute('tag') ?? '').includes('-'),
 }));
 
 vi.mock('../lib/candidates/visibility', () => ({

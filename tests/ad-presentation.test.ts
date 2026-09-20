@@ -11,6 +11,7 @@ vi.mock('../lib/candidates/visibility', () => ({ isSafeCandidateBoundary: () => 
 vi.mock('../lib/candidates/fingerprint', () => ({ presentationFingerprint: () => 'unchanged ad' }));
 
 class FixtureElement {
+  readonly localName = 'div';
   isConnected = true;
   parentElement: FixtureElement | null = null;
   readonly ownerDocument = {};

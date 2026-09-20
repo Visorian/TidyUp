@@ -27,6 +27,7 @@ class FixtureDocument {
 }
 
 class FixtureElement {
+  readonly localName = 'div';
   readonly isConnected = true;
   parentElement: FixtureElement | null = null;
   readonly children: FixtureElement[] = [];
