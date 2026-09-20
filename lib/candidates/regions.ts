@@ -23,7 +23,8 @@ import {
 const DIALOG = 'dialog,[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
 const ESSENTIAL =
   'html,body,main,nav,article,[role="main"],[role="navigation"],[role="article"],[role="application"]';
-const CONSENT = /\b(?:cookies?|consent|tracking|einwilligung\w*|zustimmung\w*|datenschutz\w*)\b/iu;
+const CONSENT =
+  /\b(?:cookies?|consent|privacy|tracking|einwilligung\w*|zustimmung\w*|datenschutz\w*)\b/iu;
 
 function isOverlay(element: Element): boolean {
   return cachedBoolean(element, 'overlay', () => overlay(element));

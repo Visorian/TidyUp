@@ -135,6 +135,22 @@ function checkPageBrandingColor(store: Readonly<PresentationStore>): string {
   return 'Page colors that arrive with an ad are removed and restored with it';
 }
 
+function checkPrivacyCenterWording(): string {
+  const frame = element('consent').querySelector('iframe');
+  assert(frame !== null, 'Consent fixture needs its frame');
+  const title = frame.getAttribute('title') ?? '';
+  frame.setAttribute('title', 'Privacy Center');
+  try {
+    assert(
+      candidate('consent').labels.includes('consent overlay'),
+      'A privacy centre overlay must carry consent evidence',
+    );
+  } finally {
+    frame.setAttribute('title', title);
+  }
+  return 'Privacy wording marks an overlay as consent evidence';
+}
+
 function checkDebugConsent(store: Readonly<PresentationStore>): string {
   const bodyBefore = document.body.style.cssText;
   assert(!hide(store, 'consent', true), 'Debug mode must not hide');
@@ -261,6 +277,7 @@ export async function runRegionChecks(): Promise<readonly string[]> {
       checkLearnedLocators(),
       checkPageSkinEvidence(),
       checkPageBrandingColor(store),
+      checkPrivacyCenterWording(),
       checkDebugConsent(store),
       checkSelection(),
       checkConsentPrivacy(),
