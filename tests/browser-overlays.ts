@@ -23,6 +23,10 @@ export function checkConsentScroll(store: Readonly<PresentationStore>): string {
     getComputedStyle(document.documentElement).overflowY === 'auto',
     'Root scroll must unlock',
   );
+  assert(
+    getComputedStyle(document.body).overflowX === 'hidden',
+    'Sideways clipping must stay as the page had it',
+  );
   assert(hide(store, 'second'), 'Second consent overlay should hide');
   store.restore(element('consent'));
   assert(

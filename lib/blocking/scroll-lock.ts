@@ -40,10 +40,9 @@ function release(document: Document): StyleChange[] {
     if (root === null) continue;
     const style = document.defaultView?.getComputedStyle(root);
     if (style === undefined) continue;
-    for (const property of ['overflow-x', 'overflow-y']) {
-      if (['hidden', 'clip'].includes(style.getPropertyValue(property)))
-        changes.push(changeStyle(root, property, 'auto'));
-    }
+    // Only the axis a page reads along is handed back; clipping sideways is ordinary layout.
+    if (['hidden', 'clip'].includes(style.getPropertyValue('overflow-y')))
+      changes.push(changeStyle(root, 'overflow-y', 'auto'));
     // A page frozen out of flow keeps the reading position in its own top edge.
     if (style.position !== 'fixed') continue;
     const offset = Number(style.top.replace('px', ''));
