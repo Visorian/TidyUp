@@ -33,7 +33,7 @@ export interface PublicSettings {
 
 export interface AdCandidate {
   readonly id: string;
-  readonly kind?: 'consent' | 'background' | 'ad-slot';
+  readonly kind?: 'overlay' | 'background' | 'ad-slot';
   readonly tag: string;
   readonly text: string;
   readonly labels: readonly string[];
@@ -50,6 +50,7 @@ export interface CandidateDisplay {
   readonly images: number;
   readonly backgroundImage: boolean;
   readonly labelOnly: boolean;
+  readonly fullViewport: boolean;
 }
 
 export interface CandidateClassification {

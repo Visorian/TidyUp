@@ -1,8 +1,24 @@
 import { isSafeCandidateBoundary } from '../candidates/visibility';
 
-const SLOT_MARKER = /(?:^|[-_])ad-?slot(?:$|[-_])/iu;
 const ESSENTIAL =
   'article,main,nav,header,footer,form,input,textarea,select,button,h1,h2,h3,h4,h5,h6,[contenteditable],[role]:not([role="presentation"]):not([role="none"])';
+// Advertising wrappers keep these words in their id or class while state classes come and go.
+const SLOT_WORD =
+  /^(?:ads?|advert(?:s|ising|isement)?|adslot|adunit|adserver|anzeige|werbung|reklame|banner|slot|sponsor(?:ed)?|promo(?:tion)?|gpt|dfp|skyscraper|fireplace)$/iu;
+// Identifiers carrying a generated counter differ on every load and cannot anchor a locator.
+const GENERATED = /\d{4,}|[\da-f]{8,}/iu;
+
+function slotWords(value: string): string[] {
+  return value
+    .replaceAll(/([a-z])([A-Z])/gu, '$1 $2')
+    .split(/[^a-z\d]+/iu)
+    .filter((word) => SLOT_WORD.test(word))
+    .map((word) => word.toLowerCase());
+}
+
+export function isStableIdentifier(id: string): boolean {
+  return id !== '' && !GENERATED.test(id);
+}
 
 export function adSlotFingerprint(element: Element): string | null {
   if (
@@ -12,16 +28,14 @@ export function adSlotFingerprint(element: Element): string | null {
     element.querySelector(ESSENTIAL) !== null
   )
     return null;
-  const id = element.getAttribute('id') ?? '';
-  const markers = [
+  // Only the advertising words survive, so a slot keeps its identity across creatives and loads.
+  const words = [
     ...new Set(
-      [id, ...(element.getAttribute('class') ?? '').split(/\s+/u)]
-        .filter((token) => SLOT_MARKER.test(token))
-        .map((token) => token.replace(/((?:^|[-_])ad-?slot)(?:[-_].*)?$/iu, '$1')),
+      slotWords(`${element.getAttribute('id') ?? ''} ${element.getAttribute('class') ?? ''}`),
     ),
   ].toSorted();
-  if (markers.length === 0) return null;
-  return JSON.stringify([element.tagName.toLowerCase(), id, markers]);
+  if (words.length === 0) return null;
+  return JSON.stringify([element.tagName.toLowerCase(), words]);
 }
 
 export function findAdSlot(element: HTMLElement, target: HTMLElement): HTMLElement | null {
@@ -32,7 +46,7 @@ export function findAdSlot(element: HTMLElement, target: HTMLElement): HTMLEleme
   for (let depth = 0; current !== null && depth < 9; depth++) {
     if (adSlotFingerprint(current) !== null) {
       outermost = current;
-      if (identified === null && current.id !== '') identified = current;
+      if (identified === null && isStableIdentifier(current.id)) identified = current;
     }
     if (current === target) return identified ?? outermost;
     current = current.parentElement;

@@ -134,6 +134,7 @@ beforeEach(() => {
   vi.stubGlobal('location', new URL('https://news.example.org/'));
   vi.stubGlobal('document', document);
   vi.stubGlobal('Element', TestElement);
+  vi.stubGlobal('HTMLElement', TestElement);
   vi.stubGlobal('Document', TestDocument);
   vi.stubGlobal(
     'window',

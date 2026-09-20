@@ -166,10 +166,18 @@ it.each([
   expect(observe).not.toHaveBeenCalled();
 });
 
-it('leaves ambiguous selectors and inactive sessions alone', async () => {
-  elements = [new HTMLElement(), new HTMLElement()];
+it('replays every repeated region a learned locator matches, bounded per locator', async () => {
+  elements = Array.from({ length: 12 }, () => new HTMLElement());
   await replay.start(settings, 1);
-  expect(mocks.extract).not.toHaveBeenCalled();
+  await settle();
+  expect(apply).toHaveBeenCalledTimes(8);
+});
+
+it('leaves inactive sessions alone', async () => {
+  await replay.start(settings, 1);
+  await settle();
+  apply.mockClear();
+  mocks.extract.mockClear();
   elements = [new HTMLElement()];
   active = false;
   mutation();

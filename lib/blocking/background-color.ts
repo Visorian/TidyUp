@@ -1,6 +1,28 @@
 import { collectContentFeatures } from '../candidates/features';
 import type { AdCandidate } from '../shared/types';
 
+const servedBackground = new WeakMap<Document, string>();
+
+// The page colour a document is served with belongs to the site. A colour applied afterwards
+// arrived with the advertising being removed, whatever markup carries it.
+export function capturePageBackground(document: Document): void {
+  if (servedBackground.has(document)) return;
+  const body: unknown = document.body;
+  if (body instanceof HTMLElement) {
+    servedBackground.set(document, body.style.getPropertyValue('background-color'));
+    return;
+  }
+  const root: unknown = document.documentElement;
+  if (!(root instanceof HTMLElement)) return;
+  const observer = new MutationObserver(() => {
+    const element: unknown = document.body;
+    if (!(element instanceof HTMLElement)) return;
+    servedBackground.set(document, element.style.getPropertyValue('background-color'));
+    observer.disconnect();
+  });
+  observer.observe(root, { childList: true });
+}
+
 export function adBackgroundVariables(
   element: HTMLElement,
   target: HTMLElement,
@@ -47,22 +69,10 @@ export function adBackgroundColorTarget(
   if (kind !== undefined && kind !== 'ad-slot') return null;
   const body = element.ownerDocument.body;
   if (!(body instanceof HTMLElement) || body === element || body === target) return null;
+  const served = servedBackground.get(element.ownerDocument);
   const color = body.style.getPropertyValue('background-color');
-  if (color === '' || body.style.getPropertyPriority('background-color') !== 'important')
-    return null;
-  if (collectContentFeatures(element, true)?.labels.includes('advertisement') !== true) return null;
-  const pending: Element[] = [target];
-  for (let visited = 0; pending.length > 0 && visited < 80; visited++) {
-    const current = pending.pop();
-    if (current === undefined) break;
-    if (
-      current instanceof HTMLElement &&
-      current.style.getPropertyValue('background-color') === color &&
-      current.style.getPropertyPriority('background-color') === 'important'
-    )
-      return body;
-    if (pending.length + current.children.length > 80) return null;
-    pending.push(...current.children);
-  }
-  return null;
+  if (color === '' || served === undefined || color === served) return null;
+  return collectContentFeatures(element, true)?.labels.includes('advertisement') === true
+    ? body
+    : null;
 }

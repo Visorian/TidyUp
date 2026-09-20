@@ -20,10 +20,10 @@ import {
   isVisible,
 } from './visibility';
 
-const DIALOG = 'dialog,[role="dialog"],[aria-modal="true"]';
+const DIALOG = 'dialog,[role="dialog"],[role="alertdialog"],[aria-modal="true"]';
 const ESSENTIAL =
   'html,body,main,nav,article,[role="main"],[role="navigation"],[role="article"],[role="application"]';
-const CONSENT = /\b(?:cookies?|consent|tracking|einwilligung|zustimmung|datenschutz)\b/iu;
+const CONSENT = /\b(?:cookies?|consent|tracking|einwilligung\w*|zustimmung\w*|datenschutz\w*)\b/iu;
 
 function isOverlay(element: Element): boolean {
   return cachedBoolean(element, 'overlay', () => overlay(element));
@@ -36,7 +36,7 @@ function overlay(element: Element): boolean {
   return position === 'fixed' || position === 'sticky';
 }
 
-function consentNodes(element: Element, hiddenRoot: boolean): readonly Node[] | null {
+function overlayNodes(element: Element, hiddenRoot: boolean): readonly Node[] | null {
   const walker = element.ownerDocument.createTreeWalker(
     element,
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
@@ -68,10 +68,11 @@ function consentNodes(element: Element, hiddenRoot: boolean): readonly Node[] | 
   return node === null ? nodes : null;
 }
 
-function consentContent(element: Element, hiddenRoot = false): CandidateContent | null {
+function overlayContent(element: Element, hiddenRoot = false): CandidateContent | null {
   if (!isOverlay(element) || hasPrivateAncestor(element)) return null;
-  const nodes = consentNodes(element, hiddenRoot);
+  const nodes = overlayNodes(element, hiddenRoot);
   if (nodes === null) return null;
+  const modal = element.matches(DIALOG);
   const text: string[] = [];
   const labels = new Set(metadataLabels(element));
   const hosts = new Set<string>();
@@ -97,10 +98,13 @@ function consentContent(element: Element, hiddenRoot = false): CandidateContent 
       text.push(value);
     }
   }
-  if (!consent) return null;
+  // Modal dialogs are summarized whenever they are safe to read, so rules can reach prompts
+  // that never mention consent. Other overlays stay ordinary candidates unless they do.
+  if (!consent && !modal) return null;
   const normalized = sanitizeText(text.join(' '));
   for (const label of signalLabels(normalized)) labels.add(label);
-  labels.add('consent overlay');
+  if (modal) labels.add('modal dialog');
+  if (consent) labels.add('consent overlay');
   return {
     text: normalized,
     labels: [...labels].toSorted(),
@@ -111,14 +115,14 @@ function consentContent(element: Element, hiddenRoot = false): CandidateContent 
   };
 }
 
-export function hasConsentAncestor(element: Element): boolean {
-  return cachedBoolean(element, 'consent-ancestor', () => consentAncestor(element));
+export function hasOverlayAncestor(element: Element): boolean {
+  return cachedBoolean(element, 'overlay-ancestor', () => overlayAncestor(element));
 }
 
-function consentAncestor(element: Element): boolean {
+function overlayAncestor(element: Element): boolean {
   let parent = composedParent(element);
   for (let depth = 0; parent !== null && depth < 64; depth += 1) {
-    if (parent.matches(DIALOG) || (isOverlay(parent) && consentContent(parent) !== null))
+    if (parent.matches(DIALOG) || (isOverlay(parent) && overlayContent(parent) !== null))
       return true;
     parent = composedParent(parent);
   }
@@ -158,17 +162,17 @@ export function extractSpecialCandidate(
     : undefined;
   const hasBackground = background !== undefined && /url\(/iu.test(background);
   if (!hasBackground && !isOverlay(element)) return null;
-  if (hasPrivateAncestor(element) || !isVisible(element) || hasConsentAncestor(element))
+  if (hasPrivateAncestor(element) || !isVisible(element) || hasOverlayAncestor(element))
     return null;
   const selection = element.ownerDocument.getSelection();
   if (selection !== null && !selection.isCollapsed && selection.containsNode(element, true))
     return null;
-  const content = consentContent(element);
+  const content = overlayContent(element);
   if (content !== null) {
     const { frames, images, ...features } = content;
     return {
       id,
-      kind: 'consent',
+      kind: 'overlay',
       tag: element.tagName.toLowerCase(),
       pageHost,
       ...features,
@@ -192,11 +196,11 @@ export function extractSpecialCandidate(
 
 export function specialPresentationFingerprint(
   element: Element,
-  kind: 'consent' | 'background',
+  kind: 'overlay' | 'background',
 ): string | null {
   if (hasPrivateAncestor(element)) return null;
-  if (kind === 'consent') {
-    const content = consentContent(element, true);
+  if (kind === 'overlay') {
+    const content = overlayContent(element, true);
     return content === null ? null : JSON.stringify(content);
   }
   if (!isBackgroundContainer(element)) return null;

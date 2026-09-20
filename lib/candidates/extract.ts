@@ -1,12 +1,12 @@
 import { CandidateReadCache, computedStyle, withCandidateReads } from './read-cache';
 import type { AdCandidate } from '../shared/types';
 import { CARD_CONTAINERS, collectFeatures, generatedAdLabel, metadataLabels } from './features';
-import { extractSpecialCandidate, hasConsentAncestor } from './regions';
+import { extractSpecialCandidate, hasOverlayAncestor } from './regions';
 import { hasPrivateAncestor, isVisible } from './visibility';
 
 const CONTAINERS = 'div,section,article,aside,li,ins,iframe,a,[role="article"],[role="listitem"]';
 const ESSENTIAL =
-  'html,body,main,nav,header,footer,[role="main"],[role="navigation"],[role="dialog"],[role="application"]';
+  'html,body,main,nav,header,footer,[role="main"],[role="navigation"],[role="dialog"],[role="alertdialog"],[role="application"]';
 
 function hasContentBoundary(element: Element): boolean {
   if (element.matches(CARD_CONTAINERS + ',iframe,ins') || metadataLabels(element).length > 0)
@@ -37,7 +37,7 @@ function extract(element: Element, id: string, pageHost: string): AdCandidate | 
   if (special !== null) return special;
   if (!element.matches(CONTAINERS) || element.matches(ESSENTIAL) || hasPrivateAncestor(element))
     return null;
-  if (element.matches('dialog,[aria-modal="true"]') || hasConsentAncestor(element)) return null;
+  if (element.matches('dialog,[aria-modal="true"]') || hasOverlayAncestor(element)) return null;
   if (element.childNodes.length > 24 || !hasContentBoundary(element) || !isVisible(element))
     return null;
   const selection = element.ownerDocument.getSelection();

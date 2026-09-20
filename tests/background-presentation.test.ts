@@ -1,5 +1,6 @@
 /* oxlint-disable eslint/max-classes-per-file -- Element and CSS rule doubles exercise reversible stylesheet cleanup. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { capturePageBackground } from '../lib/blocking/background-color';
 import { PresentationStore } from '../lib/blocking/hide';
 
 const evidence = vi.hoisted(() => ({ advertisement: true }));
@@ -19,10 +20,10 @@ vi.mock('../lib/candidates/regions', () => ({
   specialPresentationFingerprint: () => 'background',
 }));
 
-interface FixtureDocument {
-  body: FixtureElement | null;
-  readonly defaultView: null;
-  readonly location: { readonly hostname: string };
+class FixtureDocument {
+  body: FixtureElement | null = null;
+  readonly defaultView = null;
+  readonly location = { hostname: 'news.example.org' };
 }
 
 class FixtureElement {
@@ -71,17 +72,18 @@ function domElement(value: unknown): HTMLElement {
   return value;
 }
 
-function fixture(): {
+function domDocument(value: unknown): Document {
+  if (!(value instanceof Document)) throw new Error('Expected fixture document');
+  return value;
+}
+
+function fixture(servedColor = ''): {
   readonly store: PresentationStore;
   readonly ad: HTMLElement;
   readonly wrapper: HTMLElement;
   readonly body: HTMLElement;
 } {
-  const document: FixtureDocument = {
-    body: null,
-    defaultView: null,
-    location: { hostname: 'news.example.org' },
-  };
+  const document = new FixtureDocument();
   const body = new FixtureElement(document);
   const wrapper = new FixtureElement(document);
   const ad = new FixtureElement(document);
@@ -90,8 +92,12 @@ function fixture(): {
   ad.parentElement = wrapper;
   wrapper.children.push(ad);
   body.children.push(wrapper);
-  body.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
-  wrapper.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
+  if (servedColor !== '') body.style.setProperty('background-color', servedColor);
+  capturePageBackground(domDocument(document));
+  if (servedColor === '') {
+    body.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
+    wrapper.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
+  }
   return {
     store: new PresentationStore(),
     ad: domElement(ad),
@@ -102,6 +108,7 @@ function fixture(): {
 
 beforeEach(() => {
   vi.stubGlobal('HTMLElement', FixtureElement);
+  vi.stubGlobal('Document', FixtureDocument);
   evidence.advertisement = true;
 });
 afterEach(() => {
@@ -121,28 +128,25 @@ it('removes the paired inline creative color to expose site CSS and restores the
   expect(body.style.getPropertyPriority('background-color')).toBe('important');
 });
 
-it.each([
-  { value: 'rgb(10, 10, 10)', priority: 'important' },
-  { value: 'rgb(2, 74, 216)', priority: '' },
-  { value: '', priority: '' },
-])(
-  'preserves page color when the ad does not corroborate both color and priority',
-  ({ value, priority }: { readonly value: string; readonly priority: string }) => {
-    const { store, ad, wrapper, body } = fixture();
-    wrapper.style.setProperty('background-color', value, priority);
-    store.apply(ad, 0.99, 0.9, false);
-    expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
-  },
-);
+it.each(['important', ''])('removes a page color the ad applied with priority "%s"', (priority) => {
+  const { store, ad, body } = fixture();
+  body.style.setProperty('background-color', 'rgb(255, 204, 0)', priority);
+  expect(store.apply(ad, 0.99, 0.9, false)).toBe(true);
+  expect(body.style.getPropertyValue('background-color')).toBe('');
+  store.restoreAll();
+  expect(body.style.getPropertyValue('background-color')).toBe('rgb(255, 204, 0)');
+  expect(body.style.getPropertyPriority('background-color')).toBe(priority);
+});
 
-it('requires advertisement evidence and preserves normal inline page themes', () => {
+it('preserves the page color the document was served with', () => {
+  const { store, ad, body } = fixture('rgb(17, 17, 17)');
+  expect(store.apply(ad, 0.99, 0.9, false)).toBe(true);
+  expect(body.style.getPropertyValue('background-color')).toBe('rgb(17, 17, 17)');
+});
+
+it('requires advertisement evidence before touching the page color', () => {
   const { store, ad, body } = fixture();
   evidence.advertisement = false;
-  store.apply(ad, 0.99, 0.9, false);
-  expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
-  store.restoreAll();
-  evidence.advertisement = true;
-  body.style.setProperty('background-color', 'rgb(2, 74, 216)');
   store.apply(ad, 0.99, 0.9, false);
   expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
 });
@@ -174,16 +178,6 @@ it('leaves colors untouched in debug mode and for below-threshold results', () =
   expect(store.apply(ad, 0.8, 0.9, false)).toBe(false);
   expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
   expect(store.apply(ad, 0.99, 0.9, true)).toBe(false);
-  expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
-});
-
-it('finds a colored ad mount inside the classified outer wrapper', () => {
-  const { store, ad, wrapper, body } = fixture();
-  wrapper.style.removeProperty('background-color');
-  ad.style.setProperty('background-color', 'rgb(2, 74, 216)', 'important');
-  expect(store.apply(wrapper, 0.99, 0.9, false)).toBe(true);
-  expect(body.style.getPropertyValue('background-color')).toBe('');
-  store.restoreAll();
   expect(body.style.getPropertyValue('background-color')).toBe('rgb(2, 74, 216)');
 });
 

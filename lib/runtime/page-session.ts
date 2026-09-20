@@ -1,6 +1,7 @@
 /* oxlint-disable import/max-dependencies, eslint/max-lines -- Keep bounded hidden-decision replay with the page presentation lifecycle. */
 import { browser } from 'wxt/browser';
 import { adSlotFingerprint } from '../blocking/ad-slot';
+import { capturePageBackground } from '../blocking/background-color';
 import { PresentationStore, watchPresentation } from '../blocking/hide';
 import { enumerateElements, extractCandidate } from '../candidates/extract';
 import { CandidateReadCache } from '../candidates/read-cache';
@@ -105,6 +106,7 @@ export class PageSession {
     },
   });
   start(): void {
+    capturePageBackground(document);
     browser.runtime.onMessage.addListener(this.onMessage);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('popstate', this.onNavigation);
@@ -323,6 +325,7 @@ export class PageSession {
       this.metrics.restored++;
       this.metrics.hidden = Math.max(0, this.metrics.hidden - 1);
     }
+    if (change.retargeted) this.rememberTarget(change.element);
     if (change.root !== null) {
       this.queue.forget(change.element);
       this.queue.forget(change.root);
@@ -331,6 +334,13 @@ export class PageSession {
       this.addRoot(change.root);
     }
     return true;
+  }
+  private rememberTarget(element: Element): void {
+    const decision = this.hiddenDecisions.get(element);
+    if (decision === undefined) return;
+    const target = this.presentations.target(element);
+    watchPresentation(this.observer, target);
+    this.replay.remember(element, decision.pending.candidate, this.generation, target);
   }
   private inspect(element: Element, reads: Readonly<CandidateReadCache>): void {
     this.metrics.scanned++;

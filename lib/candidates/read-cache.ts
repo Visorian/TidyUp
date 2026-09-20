@@ -1,4 +1,4 @@
-type BooleanRead = 'private' | 'hidden' | 'overlay' | 'consent-ancestor';
+type BooleanRead = 'private' | 'hidden' | 'overlay' | 'overlay-ancestor';
 
 export class CandidateReadCache {
   private styles = new WeakMap<Element, Map<string, CSSStyleDeclaration | undefined>>();

@@ -8,7 +8,7 @@ import { POLICY_VERSION } from './policy';
 const STORAGE_KEY = 'replayCache';
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_ENTRIES = 512;
-const MAX_PAGE_ENTRIES = 64;
+const MAX_SITE_ENTRIES = 64;
 
 export interface ReplayEntry {
   readonly selector: string;
@@ -26,7 +26,6 @@ export interface ReplaySnapshot {
 }
 
 interface StoredEntry extends ReplayEntry {
-  readonly page: string;
   readonly site: string;
   readonly policy: string;
   readonly timestamp: number;
@@ -90,7 +89,6 @@ function parseEntry(value: unknown): StoredEntry | null {
     !validSelector(value['selector']) ||
     (value['kind'] !== undefined && value['kind'] !== 'ad-slot') ||
     !validHash(value['fingerprintHash']) ||
-    !validHash(value['page']) ||
     !validHash(value['site']) ||
     !validHash(value['policy']) ||
     typeof value['timestamp'] !== 'number' ||
@@ -107,7 +105,6 @@ function parseEntry(value: unknown): StoredEntry | null {
     selector: value['selector'],
     ...(value['kind'] === 'ad-slot' ? { kind: 'ad-slot' as const } : {}),
     fingerprintHash: value['fingerprintHash'],
-    page: value['page'],
     site: value['site'],
     policy: value['policy'],
     timestamp: value['timestamp'],
@@ -120,7 +117,7 @@ export function parseReplaySnapshot(value: unknown): ReplaySnapshot | null {
     !isRecord(value) ||
     typeof value['epoch'] !== 'string' ||
     !Array.isArray(value['entries']) ||
-    value['entries'].length > MAX_PAGE_ENTRIES
+    value['entries'].length > MAX_SITE_ENTRIES
   )
     return null;
   const entries: ReplayEntry[] = [];
@@ -164,9 +161,11 @@ export async function getReplayEntries(
   pageUrl: string,
   settings: Settings,
 ): Promise<ReplaySnapshot> {
-  if (pageHost(pageUrl, settings) === null) return { epoch: '', entries: [] };
-  const [page, policy, cache] = await Promise.all([
-    hash(pageUrl),
+  const host = pageHost(pageUrl, settings);
+  if (host === null) return { epoch: '', entries: [] };
+  // Regions are learned per site so a locator also applies to pages that were never classified.
+  const [site, policy, cache] = await Promise.all([
+    hash(host),
     hash(JSON.stringify([POLICY_VERSION, settings])),
     readCache(),
   ]);
@@ -175,12 +174,12 @@ export async function getReplayEntries(
     entries: cache.entries
       .filter(
         (entry) =>
-          entry.page === page &&
+          entry.site === site &&
           entry.policy === policy &&
           entry.result.probability >= settings.threshold &&
           entry.result.ruleProbabilities.length === activeRules(settings).length,
       )
-      .slice(-MAX_PAGE_ENTRIES)
+      .slice(-MAX_SITE_ENTRIES)
       .map(({ selector, fingerprintHash, result, kind }) => ({
         selector,
         fingerprintHash,
@@ -216,15 +215,13 @@ export async function rememberReplay(
     result.probability < settings.threshold
   )
     return;
-  const [page, site, policy, fingerprintHash] = await Promise.all([
-    hash(pageUrl),
+  const [site, policy, fingerprintHash] = await Promise.all([
     hash(host),
     hash(JSON.stringify([POLICY_VERSION, settings])),
     slotFingerprint === undefined ? hashReplayFingerprint(candidate) : hash(slotFingerprint),
   ]);
   await storeReplay(
     {
-      page,
       site,
       policy,
       selector,
@@ -238,20 +235,20 @@ export async function rememberReplay(
 }
 
 async function storeReplay(addition: StoredEntry, epoch: string): Promise<void> {
-  const { page, policy, selector } = addition;
+  const { site, policy, selector } = addition;
   await navigator.locks.request('tidyup-replay', async () => {
     const current = await readCache();
     if (current.epoch !== epoch) return;
-    const others = current.entries.filter((entry) => entry.page !== page);
-    const samePage = current.entries
+    const others = current.entries.filter((entry) => entry.site !== site);
+    const sameSite = current.entries
       .filter(
-        (entry) => entry.page === page && entry.policy === policy && entry.selector !== selector,
+        (entry) => entry.site === site && entry.policy === policy && entry.selector !== selector,
       )
-      .slice(-(MAX_PAGE_ENTRIES - 1));
+      .slice(-(MAX_SITE_ENTRIES - 1));
     await browser.storage.local.set({
       [STORAGE_KEY]: {
         epoch: current.epoch,
-        entries: [...others, ...samePage, addition].slice(-MAX_ENTRIES),
+        entries: [...others, ...sameSite, addition].slice(-MAX_ENTRIES),
       },
     });
   });

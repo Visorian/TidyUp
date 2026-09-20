@@ -115,6 +115,19 @@ it('remembers the closest identified slot inside the validated presentation boun
   expect(adSlotFingerprint(element())).toBeNull();
 });
 
+it('keeps one slot identity across creative states and generated identifiers', () => {
+  const before = element();
+  const after = element();
+  const teaser = element();
+  before.id = 'adCont_7687366005231715545';
+  before.setAttribute('class', 'Ad-Slot Ad-Slot-desktop');
+  after.id = 'adCont_2231908877665';
+  after.setAttribute('class', 'Ad-Slot Ad-Slot-desktop Ad-Slot--filled');
+  teaser.setAttribute('class', 'teaser-card');
+  expect(adSlotFingerprint(before)).toBe(adSlotFingerprint(after));
+  expect(adSlotFingerprint(teaser)).toBeNull();
+});
+
 it('keeps a learned empty slot hidden while its creative loads and restores it on request', () => {
   const node = slot();
   const store = new PresentationStore();
@@ -127,6 +140,17 @@ it('keeps a learned empty slot hidden while its creative loads and restores it o
   expect(node.style.getPropertyValue('display')).toBe('none');
   expect(store.restoreAll()).toBe(1);
   expect(node.style.getPropertyValue('display')).toBe('');
+});
+
+it('keeps a slot hidden on its first decision while the creative arrives', () => {
+  const node = slot();
+  const store = new PresentationStore();
+  expect(store.apply(node, 0.99, 0.9, false)).toBe(true);
+  element('iframe', node);
+  node.setAttribute('class', 'go-ad-slot__wrapper loaded go-ad-slot--filled');
+  store.queueChanges([node]);
+  expect(store.restoreNext()?.restored).toBe(false);
+  expect(node.style.getPropertyValue('display')).toBe('none');
 });
 
 it.each(['article', 'h2', 'input', 'button'])(

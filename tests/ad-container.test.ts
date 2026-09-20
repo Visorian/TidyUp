@@ -10,6 +10,11 @@ vi.mock('../lib/candidates/features', async (importOriginal) => ({
   }),
 }));
 
+vi.mock('../lib/blocking/ad-slot', () => ({
+  adSlotFingerprint: (element: Element) =>
+    element.getAttribute('test-slot') === 'true' ? '["div",["ad"]]' : null,
+}));
+
 vi.mock('../lib/candidates/visibility', () => ({
   INERT_ELEMENTS: 'script,style,template,noscript',
   isSafeCandidateBoundary: (element: Element) => element.getAttribute('test-unsafe') !== 'true',
@@ -123,6 +128,25 @@ it.each(['a', 'img', 'input', 'button', 'iframe', 'svg'])(
     expect(findAdContainer(ad)).toBe(ad);
   },
 );
+
+it('collapses an ad slot wrapper that also holds a neighbouring creative frame', () => {
+  const ad = advertisement();
+  const creative = createNode('iframe');
+  creative.setAttribute('width', '160');
+  creative.setAttribute('height', '600');
+  const hull = createNode('div', ad, creative);
+  hull.setAttribute('test-slot', 'true');
+  const slot = createNode('div', hull, createNode('span', 'Anzeige'));
+  slot.setAttribute('test-slot', 'true');
+  expect(findAdContainer(ad)).toBe(slot);
+});
+
+it('keeps editorial text out of a marked ad slot wrapper', () => {
+  const ad = advertisement();
+  const hull = createNode('div', ad, createNode('span', 'Latest news'));
+  hull.setAttribute('test-slot', 'true');
+  expect(findAdContainer(ad)).toBe(ad);
+});
 
 it('stops promotion at real sibling text while collapsing an inner ad-only hull', () => {
   const ad = advertisement();

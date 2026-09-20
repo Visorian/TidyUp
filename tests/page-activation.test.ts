@@ -55,6 +55,7 @@ beforeEach(() => {
   page = new URL('https://news.example.org/');
   events = new EventTarget();
   vi.stubGlobal('location', page);
+  vi.stubGlobal('HTMLElement', Date);
   vi.stubGlobal(
     'document',
     Object.assign(new EventTarget(), {

@@ -1,5 +1,6 @@
 import { collectContentFeatures, isAdvertisementLabel } from '../candidates/features';
 import { INERT_ELEMENTS, isSafeCandidateBoundary } from '../candidates/visibility';
+import { adSlotFingerprint } from './ad-slot';
 
 const CONTAINERS = 'div,section,aside,ins';
 const EMPTY_ELEMENTS = `${CONTAINERS},span`;
@@ -37,6 +38,9 @@ export function isAdContainer(container: HTMLElement, element: HTMLElement): boo
 }
 
 function hasOnlyAdSurroundings(container: HTMLElement, element: HTMLElement): boolean {
+  // A wrapper the site marks as an ad slot often holds neighbouring ad markup, such as a second
+  // creative frame. Its own text still has to stay empty or an advertising label.
+  const marked = adSlotFingerprint(container) !== null;
   const pending: Node[] = [container];
   for (let visited = 0; pending.length > 0 && visited < 80; visited++) {
     const node = pending.pop();
@@ -49,8 +53,11 @@ function hasOnlyAdSurroundings(container: HTMLElement, element: HTMLElement): bo
     if (node.nodeType === Node.COMMENT_NODE) continue;
     if (!(node instanceof HTMLElement)) return false;
     if (node.matches(INERT_ELEMENTS)) continue;
-    if (isMeasurementFrame(node)) continue;
-    if (!node.matches(EMPTY_ELEMENTS) || node.matches(INTERACTIVE) || !safeDecoration(node))
+    if (
+      !marked &&
+      !isMeasurementFrame(node) &&
+      (!node.matches(EMPTY_ELEMENTS) || node.matches(INTERACTIVE) || !safeDecoration(node))
+    )
       return false;
     if (pending.length + node.childNodes.length > 80) return false;
     pending.push(...node.childNodes);

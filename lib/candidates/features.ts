@@ -134,6 +134,7 @@ export function displayFeatures(
   const style = computedStyle(element);
   const bounds = element.getBoundingClientRect();
   const position = style?.position;
+  const view = element.ownerDocument.defaultView;
   return {
     position:
       position === 'fixed' || position === 'sticky' || position === 'absolute' ? position : 'flow',
@@ -143,6 +144,11 @@ export function displayFeatures(
     images,
     backgroundImage: style !== undefined && style.backgroundImage !== 'none',
     labelOnly: text === '' || isAdvertisementLabel(text),
+    // Page skins and interstitials are otherwise indistinguishable from an ordinary frame.
+    fullViewport:
+      view !== null &&
+      bounds.width >= view.innerWidth * 0.9 &&
+      bounds.height >= view.innerHeight * 0.9,
   };
 }
 

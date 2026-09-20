@@ -12,22 +12,22 @@ const candidate: AdCandidate = {
   pageHost: 'news.example.org',
 };
 
-it.each(['consent', 'background'] as const)('preserves supported %s candidate kinds', (kind) => {
+it.each(['overlay', 'background'] as const)('preserves supported %s candidate kinds', (kind) => {
   const specialized = { ...candidate, kind };
   expect(parseCandidates([specialized], candidate.pageHost)).toEqual([specialized]);
   expect(candidateFingerprint(specialized)).not.toBe(candidateFingerprint(candidate));
 });
 
-it.each(['dialog', 'advertisement', '', null, 1])(
+it.each(['consent', 'dialog', 'advertisement', '', null, 1])(
   'rejects an unknown candidate kind %s',
   (kind) => {
     expect(parseCandidates([{ ...candidate, kind }], candidate.pageHost)).toBeNull();
   },
 );
 
-it('keeps ordinary candidates valid and separates consent from background decisions', () => {
+it('keeps ordinary candidates valid and separates overlay from background decisions', () => {
   expect(parseCandidates([candidate], candidate.pageHost)).toEqual([candidate]);
-  expect(candidateFingerprint({ ...candidate, kind: 'consent' })).not.toBe(
+  expect(candidateFingerprint({ ...candidate, kind: 'overlay' })).not.toBe(
     candidateFingerprint({ ...candidate, kind: 'background' }),
   );
 });

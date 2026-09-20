@@ -50,7 +50,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-it('remembers a locator only for its exact page and stores hashed content and policy', async () => {
+it('remembers a locator for the whole site and stores hashed content and policy', async () => {
   await remember();
   const snapshot = await getReplayEntries(url, settings);
   expect(snapshot.entries).toEqual([
@@ -60,7 +60,11 @@ it('remembers a locator only for its exact page and stores hashed content and po
       result: { probability: 0.99, ruleProbabilities: [0.99] },
     },
   ]);
-  expect((await getReplayEntries(`${url}?different`, settings)).entries).toEqual([]);
+  // A region learned on one page also applies to pages of the same site that were never seen.
+  expect((await getReplayEntries('https://news.example.org/other', settings)).entries).toEqual(
+    snapshot.entries,
+  );
+  expect((await getReplayEntries('https://other.example.org/', settings)).entries).toEqual([]);
   const persisted = JSON.stringify([...storage.values.values()]);
   for (const privateValue of [url, candidate.pageHost, candidate.text, settings.rules[0]])
     expect(persisted).not.toContain(privateValue);
@@ -111,7 +115,7 @@ it('expires learned regions after seven days', async () => {
   expect((await getReplayEntries(url, settings)).entries).toEqual([]);
 });
 
-it('bounds the learned regions per page and replaces an existing locator', async () => {
+it('bounds the learned regions per site and replaces an existing locator', async () => {
   await Array.from({ length: 70 }, (_, index) => index).reduce(
     (previous: Readonly<Promise<void>>, index) =>
       previous.then(() => remember(url, candidate, `#ad-${index}`)),

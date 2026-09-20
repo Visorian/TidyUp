@@ -1,24 +1,10 @@
 import { checkDynamicMutations, checkQueueOverlap } from './browser-runtime';
+import { capturePageBackground } from '../lib/blocking/background-color';
 import { PresentationStore } from '../lib/blocking/hide';
 import { extractCandidate } from '../lib/candidates/extract';
+import { checkLearnedLocators, checkPageSkinEvidence } from './browser-locators';
+import { assert, candidate, element } from './browser-support';
 import { candidateFingerprint } from '../lib/candidates/fingerprint';
-import type { AdCandidate } from '../lib/shared/types';
-
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new Error(message);
-}
-
-function element(id: string): HTMLElement {
-  const value = document.querySelector(`#${id}`);
-  if (!(value instanceof HTMLElement)) throw new Error(`Missing fixture: ${id}`);
-  return value;
-}
-
-function candidate(id: string): AdCandidate {
-  const value = extractCandidate(element(id), id, 'news.example.org');
-  if (value === null) throw new Error(`Expected candidate: ${id}`);
-  return value;
-}
 
 function hide(store: Readonly<PresentationStore>, id: string, debug = false): boolean {
   const value = candidate(id);
@@ -41,6 +27,14 @@ function createFixtures(): void {
     </div>
     <div id="consent" class="overlay" role="dialog" aria-modal="true">
       <iframe title="SP Consent Message" src="about:blank" width="500" height="300"></iframe>
+    </div>
+    <div id="ads">
+      <div id="ad-7687366005231715545" class="Ad-Slot"><span>Anzeige</span></div>
+      <div id="sidebar-ads" class="Ad-Slot"><span>Anzeige</span></div>
+    </div>
+    <div id="notify" class="overlay" role="alertdialog" aria-modal="true">
+      <span>Jetzt Benachrichtigungen und werbliche Partner-Angebote erhalten!</span>
+      <button>Deny</button><button id="allow">Allow</button>
     </div>
     <div id="second" class="overlay" role="dialog">
       <p>We use cookies and tracking. Choose whether to agree or subscribe.</p>
@@ -83,7 +77,7 @@ function checkConsentScroll(store: Readonly<PresentationStore>): string {
   element('agree').addEventListener('click', () => {
     clicks++;
   });
-  assert(candidate('consent').kind === 'consent', 'Consent iframe wrapper must be identified');
+  assert(candidate('consent').kind === 'overlay', 'Consent iframe wrapper must be identified');
   assert(hide(store, 'consent'), 'Consent wrapper should hide');
   assert(getComputedStyle(element('consent')).display === 'none', 'Whole dialog must hide');
   assert(getComputedStyle(document.body).overflowY === 'auto', 'Body scroll must unlock');
@@ -102,6 +96,43 @@ function checkConsentScroll(store: Readonly<PresentationStore>): string {
   assert(document.documentElement.style.cssText === rootBefore, 'Original root styles must return');
   assert(clicks === 0, 'Hiding must not choose consent');
   return 'Consent wrappers and scroll locks restore without clicking consent controls';
+}
+
+function checkNotificationPrompt(store: Readonly<PresentationStore>): string {
+  const prompt = candidate('notify');
+  assert(prompt.kind === 'overlay', 'Notification prompts must be summarized as one overlay');
+  assert(prompt.labels.includes('modal dialog'), 'Modal dialogs must be labelled for rules');
+  assert(!prompt.labels.includes('consent overlay'), 'Consent wording must stay its own signal');
+  assert(prompt.text.includes('Benachrichtigungen'), 'Prompt copy must reach the classifier');
+  assert(
+    extractCandidate(element('allow'), 'allow', 'news.example.org') === null,
+    'Prompt controls must not be classified separately',
+  );
+  assert(hide(store, 'notify'), 'A matching rule should hide the prompt');
+  assert(getComputedStyle(element('notify')).display === 'none', 'Whole prompt must hide');
+  store.restoreAll();
+  return 'Notification permission prompts reach user rules without consent wording';
+}
+
+function checkPageBrandingColor(store: Readonly<PresentationStore>): string {
+  const body = document.body;
+  body.style.setProperty('background-color', 'rgb(255, 204, 0)');
+  try {
+    assert(hide(store, 'banner'), 'Banner should hide');
+    assert(
+      body.style.getPropertyValue('background-color') === '',
+      'A page color applied after the document was served must go with the ad',
+    );
+    store.restoreAll();
+    assert(
+      body.style.getPropertyValue('background-color') === 'rgb(255, 204, 0)',
+      'Revealing the ad must return the page color',
+    );
+  } finally {
+    store.restoreAll();
+    body.style.removeProperty('background-color');
+  }
+  return 'Page colors that arrive with an ad are removed and restored with it';
 }
 
 function checkDebugConsent(store: Readonly<PresentationStore>): string {
@@ -215,6 +246,7 @@ function checkSelection(): string {
 }
 
 export async function runRegionChecks(): Promise<readonly string[]> {
+  capturePageBackground(document);
   createFixtures();
   const store = new PresentationStore();
   try {
@@ -225,6 +257,10 @@ export async function runRegionChecks(): Promise<readonly string[]> {
       checkBodyBackground(store),
       checkDisplayBanner(store),
       checkConsentScroll(store),
+      checkNotificationPrompt(store),
+      checkLearnedLocators(),
+      checkPageSkinEvidence(),
+      checkPageBrandingColor(store),
       checkDebugConsent(store),
       checkSelection(),
       checkConsentPrivacy(),

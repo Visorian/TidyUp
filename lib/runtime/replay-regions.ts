@@ -1,4 +1,4 @@
-import { adSlotFingerprint, findAdSlot } from '../blocking/ad-slot';
+import { adSlotFingerprint, findAdSlot, isStableIdentifier } from '../blocking/ad-slot';
 import { extractCandidate } from '../candidates/extract';
 import { candidateFingerprint } from '../candidates/fingerprint';
 import { parseReplaySnapshot, type ReplayEntry } from '../classifier/replay-cache';
@@ -11,11 +11,13 @@ export function regionSelector(element: Element): string | null {
   const parts: string[] = [];
   let current: Element | null = element;
   while (current !== null && parts.length < 12) {
-    if (current.id === '') {
+    if (isStableIdentifier(current.id))
+      parts.unshift(`${current.localName}#${CSS.escape(current.id)}`);
+    else {
       const siblings = current.parentElement?.children;
       const index = siblings === undefined ? 1 : [...siblings].indexOf(current) + 1;
       parts.unshift(`${current.localName}:nth-child(${index})`);
-    } else parts.unshift(`${current.localName}#${CSS.escape(current.id)}`);
+    }
     const selector = parts.join(' > ');
     if (selector.length > 1000) return null;
     const matches = document.querySelectorAll(selector);
@@ -24,6 +26,8 @@ export function regionSelector(element: Element): string | null {
   }
   return null;
 }
+
+const MAX_MATCHES = 8;
 
 interface ReplayOptions {
   readonly active: () => boolean;
@@ -115,43 +119,45 @@ export class ReplayRegions {
   private readonly scan = (): void => {
     if (!this.options.active()) return;
     for (const entry of this.entries) {
-      let elements: NodeListOf<Element>;
+      let elements: readonly Element[];
       try {
-        elements = document.querySelectorAll(entry.selector);
+        // A learned locator can describe repeated regions, so every match is checked in turn.
+        elements = [...document.querySelectorAll(entry.selector)].slice(0, MAX_MATCHES);
       } catch {
         continue;
       }
-      if (elements.length !== 1) continue;
-      const element = elements[0];
-      if (element === undefined || this.options.hidden(element) || this.pending.has(element))
-        continue;
-      const slotFingerprint = entry.kind === 'ad-slot' ? adSlotFingerprint(element) : null;
-      const candidate: AdCandidate | null =
-        entry.kind === 'ad-slot'
-          ? slotFingerprint === null
-            ? null
-            : {
-                id: 'replay',
-                kind: 'ad-slot',
-                tag: element.localName,
-                text: slotFingerprint,
-                labels: ['advertisement'],
-                linkHosts: [],
-                pageHost: location.hostname,
-              }
-          : extractCandidate(element, 'replay', location.hostname);
-      if (candidate === null) continue;
-      const fingerprint = slotFingerprint ?? candidateFingerprint(candidate);
-      if (this.checked.get(element) === fingerprint) continue;
-      this.pending.add(element);
-      const version = this.version;
-      void this.match(element, candidate, fingerprint, entry, version)
-        .catch(() => {})
-        .finally(() => {
-          if (version === this.version) this.pending.delete(element);
-        });
+      for (const element of elements) this.consider(entry, element);
     }
   };
+
+  private consider(entry: Readonly<ReplayEntry>, element: Element): void {
+    if (this.options.hidden(element) || this.pending.has(element)) return;
+    const slotFingerprint = entry.kind === 'ad-slot' ? adSlotFingerprint(element) : null;
+    const candidate: AdCandidate | null =
+      entry.kind === 'ad-slot'
+        ? slotFingerprint === null
+          ? null
+          : {
+              id: 'replay',
+              kind: 'ad-slot',
+              tag: element.localName,
+              text: slotFingerprint,
+              labels: ['advertisement'],
+              linkHosts: [],
+              pageHost: location.hostname,
+            }
+        : extractCandidate(element, 'replay', location.hostname);
+    if (candidate === null) return;
+    const fingerprint = slotFingerprint ?? candidateFingerprint(candidate);
+    if (this.checked.get(element) === fingerprint) return;
+    this.pending.add(element);
+    const version = this.version;
+    void this.match(element, candidate, fingerprint, entry, version)
+      .catch(() => {})
+      .finally(() => {
+        if (version === this.version) this.pending.delete(element);
+      });
+  }
 
   private async match(
     element: Element,

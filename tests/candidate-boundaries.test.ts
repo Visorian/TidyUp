@@ -4,7 +4,7 @@ import { extractCandidate } from '../lib/candidates/extract';
 const state = vi.hoisted(() => ({ private: false, visible: true }));
 vi.mock('../lib/candidates/regions', () => ({
   extractSpecialCandidate: () => null,
-  hasConsentAncestor: () => false,
+  hasOverlayAncestor: () => false,
 }));
 vi.mock('../lib/candidates/visibility', () => ({
   hasPrivateAncestor: () => state.private,
@@ -18,7 +18,14 @@ vi.mock('../lib/candidates/features', () => ({
     text: 'International lesen, einmal zahlen. Ab 1 € testen.',
     labels: [],
     linkHosts: ['service.example.org'],
-    display: { position: 'fixed', frames: 0, images: 0, backgroundImage: false, labelOnly: false },
+    display: {
+      position: 'fixed',
+      frames: 0,
+      images: 0,
+      backgroundImage: false,
+      labelOnly: false,
+      fullViewport: false,
+    },
   }),
 }));
 

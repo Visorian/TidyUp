@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { PresentationStore } from '../lib/blocking/hide';
 
-const boundaries = vi.hoisted(() => ({ valid: true }));
+const boundaries = vi.hoisted(() => ({ valid: true, promote: true }));
 vi.mock('../lib/blocking/ad-container', () => ({
-  findAdContainer: (element: { readonly parentElement: unknown }) => element.parentElement,
+  findAdContainer: (element: { readonly parentElement: unknown }) =>
+    boundaries.promote ? element.parentElement : element,
   isAdContainer: () => boundaries.valid,
 }));
 vi.mock('../lib/candidates/visibility', () => ({ isSafeCandidateBoundary: () => true }));
@@ -48,6 +49,7 @@ function fixture(): {
 } {
   vi.stubGlobal('HTMLElement', FixtureElement);
   boundaries.valid = true;
+  boundaries.promote = true;
   const wrapper = new FixtureElement();
   const ad = new FixtureElement();
   const sibling = new FixtureElement();
@@ -82,7 +84,31 @@ it('restores and rescans the wrapper when a sibling gains meaningful content', (
   store.apply(ad, 0.99, 0.9, false);
   boundaries.valid = false;
   store.queueChanges([sibling]);
-  expect(store.restoreNext()).toEqual({ restored: true, root: wrapper, element: ad });
+  expect(store.restoreNext()).toEqual({
+    restored: true,
+    retargeted: false,
+    root: wrapper,
+    element: ad,
+  });
+  expect(wrapper.style.getPropertyValue('display')).toBe('');
+});
+
+it('moves the hide onto the slot wrapper once the placement finishes', () => {
+  const { store, ad, wrapper } = fixture();
+  boundaries.promote = false;
+  store.apply(ad, 0.99, 0.9, false);
+  expect(ad.style.getPropertyValue('display')).toBe('none');
+  boundaries.promote = true;
+  store.queueChanges([ad]);
+  expect(store.restoreNext()).toEqual({
+    restored: false,
+    retargeted: true,
+    root: null,
+    element: ad,
+  });
+  expect(wrapper.style.getPropertyValue('display')).toBe('none');
+  expect(ad.style.getPropertyValue('display')).toBe('');
+  expect(store.restoreAll()).toBe(1);
   expect(wrapper.style.getPropertyValue('display')).toBe('');
 });
 

@@ -285,7 +285,7 @@ function overlaps(first: Readonly<PendingCandidate>, second: Readonly<PendingCan
 
 function prefersContainer(candidate: AdCandidate): boolean {
   return (
-    candidate.kind === 'consent' ||
+    candidate.kind === 'overlay' ||
     (candidate.display?.labelOnly === true && candidate.labels.includes('advertisement'))
   );
 }

@@ -5,15 +5,8 @@ import type { AdCandidate } from '../shared/types';
 import { findAdContainer, isAdContainer } from './ad-container';
 import { adSlotFingerprint } from './ad-slot';
 import { adBackgroundColorTarget, adBackgroundVariables } from './background-color';
-
-interface StyleChange {
-  readonly element: HTMLElement;
-  readonly property: string;
-  readonly value: string;
-  readonly priority: string;
-  readonly applied: string;
-  readonly appliedPriority: string;
-}
+import { ScrollLocks } from './scroll-lock';
+import { changeStyle, restoreStyle, type StyleChange } from './style-change';
 
 interface Presentation {
   readonly element: HTMLElement;
@@ -22,37 +15,6 @@ interface Presentation {
   readonly debug: boolean;
   readonly changes: readonly StyleChange[];
   readonly fingerprint: string;
-}
-
-interface ScrollLock {
-  readonly overlays: Set<Element>;
-  readonly changes: readonly StyleChange[];
-}
-
-function changeStyle(element: HTMLElement, property: string, applied: string): StyleChange {
-  const change = {
-    element,
-    property,
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-  element.style.setProperty(property, applied, 'important');
-  return {
-    ...change,
-    applied: element.style.getPropertyValue(property),
-    appliedPriority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreStyle(change: StyleChange): void {
-  const { element, property, applied, value, priority } = change;
-  if (
-    element.style.getPropertyValue(property) !== applied ||
-    element.style.getPropertyPriority(property) !== change.appliedPriority
-  )
-    return;
-  if (value === '') element.style.removeProperty(property);
-  else element.style.setProperty(property, value, priority);
 }
 
 function fingerprint(element: Element, kind: AdCandidate['kind']): string | null {
@@ -76,7 +38,7 @@ function safePresentation(element: Element): boolean {
 export class PresentationStore {
   private readonly entries = new Map<Element, Presentation>();
   private readonly pending = new Set<Element>();
-  private readonly scrollLocks = new Map<Document, ScrollLock>();
+  private readonly scrollLocks = new ScrollLocks();
 
   get hasPending(): boolean {
     return this.pending.size > 0;
@@ -113,13 +75,17 @@ export class PresentationStore {
     )
       return false;
     if (!debug && probability < threshold) return false;
-    const currentFingerprint = fingerprint(element, kind);
+    // A slot keeps its identity while its creative loads, so the hide survives the late markup.
+    const identity = kind ?? (adSlotFingerprint(element) === null ? undefined : 'ad-slot');
+    const currentFingerprint = fingerprint(element, identity);
     if (currentFingerprint === null) return false;
     const target =
-      !debug && (kind === undefined || kind === 'ad-slot') ? findAdContainer(element) : element;
-    const property = debug ? 'outline' : kind === 'background' ? 'background-image' : 'display';
+      !debug && (identity === undefined || identity === 'ad-slot')
+        ? findAdContainer(element)
+        : element;
+    const property = debug ? 'outline' : identity === 'background' ? 'background-image' : 'display';
     const color = probability >= threshold ? '#dc2626' : probability <= 0.1 ? '#16a34a' : '#ca8a04';
-    const background = debug ? null : adBackgroundColorTarget(element, target, kind);
+    const background = debug ? null : adBackgroundColorTarget(element, target, identity);
     const variables = debug ? [] : adBackgroundVariables(element, target);
     const changes = [changeStyle(target, property, debug ? `3px solid ${color}` : 'none')];
     if (background !== null) changes.push(changeStyle(background, 'background-color', ''));
@@ -128,43 +94,13 @@ export class PresentationStore {
     this.entries.set(element, {
       element,
       target,
-      kind,
+      kind: identity,
       debug,
       fingerprint: currentFingerprint,
       changes,
     });
-    if (kind === 'consent' && !debug) this.unlockScrolling(element);
+    if (identity === 'overlay' && !debug) this.scrollLocks.unlock(element);
     return !debug;
-  }
-
-  private unlockScrolling(element: HTMLElement): void {
-    const document = element.ownerDocument;
-    const existing = this.scrollLocks.get(document);
-    if (existing !== undefined) {
-      existing.overlays.add(element);
-      return;
-    }
-    const changes: StyleChange[] = [];
-    for (const root of [document.documentElement, document.body]) {
-      if (root === null) continue;
-      const style = document.defaultView?.getComputedStyle(root);
-      if (style === undefined) continue;
-      for (const property of ['overflow-x', 'overflow-y']) {
-        if (['hidden', 'clip'].includes(style.getPropertyValue(property)))
-          changes.push(changeStyle(root, property, 'auto'));
-      }
-    }
-    this.scrollLocks.set(document, { overlays: new Set([element]), changes });
-  }
-
-  private restoreScrolling(element: HTMLElement): void {
-    const document = element.ownerDocument;
-    const lock = this.scrollLocks.get(document);
-    if (lock === undefined) return;
-    lock.overlays.delete(element);
-    if (lock.overlays.size > 0) return;
-    for (const change of lock.changes) restoreStyle(change);
-    this.scrollLocks.delete(document);
   }
 
   restore(element: Element): boolean {
@@ -172,7 +108,7 @@ export class PresentationStore {
     const entry = this.entries.get(element);
     if (entry === undefined) return false;
     for (const change of entry.changes) restoreStyle(change);
-    if (entry.kind === 'consent' && !entry.debug) this.restoreScrolling(entry.element);
+    if (entry.kind === 'overlay' && !entry.debug) this.scrollLocks.restore(entry.element);
     this.entries.delete(element);
     return !entry.debug;
   }
@@ -222,14 +158,42 @@ export class PresentationStore {
     }
   }
 
+  // A placement can finish after it was hidden, only then revealing the wrapper that reserves its
+  // space. Moving the hide up collapses that space without waiting for a second decision.
+  private retarget(entry: Readonly<Presentation>): Presentation | null {
+    if (entry.debug || (entry.kind !== undefined && entry.kind !== 'ad-slot')) return null;
+    const target = findAdContainer(entry.element);
+    if (target === entry.target || !target.contains(entry.target)) return null;
+    const previous = entry.changes.find(
+      (change) => change.element === entry.target && change.property === 'display',
+    );
+    if (previous === undefined) return null;
+    const moved: Presentation = {
+      ...entry,
+      target,
+      changes: [
+        changeStyle(target, 'display', 'none'),
+        ...entry.changes.filter((change) => change !== previous),
+      ],
+    };
+    restoreStyle(previous);
+    this.entries.set(entry.element, moved);
+    return moved;
+  }
+
   restoreNext():
-    | { readonly restored: boolean; readonly root: Element | null; readonly element: Element }
+    | {
+        readonly restored: boolean;
+        readonly retargeted: boolean;
+        readonly root: Element | null;
+        readonly element: Element;
+      }
     | undefined {
     const element = this.pending.values().next().value;
     if (element === undefined) return undefined;
     this.pending.delete(element);
     const entry = this.entries.get(element);
-    if (entry === undefined) return { restored: false, root: null, element };
+    if (entry === undefined) return { restored: false, retargeted: false, root: null, element };
     const background =
       entry.debug || entry.kind === 'background'
         ? null
@@ -241,18 +205,29 @@ export class PresentationStore {
       fingerprint(element, entry.kind) === entry.fingerprint &&
       entry.changes.every(
         (change) =>
-          (change.element === background && change.property === 'background-color') ||
+          // An ad script reapplying the colour we removed stays ours to clean; any other value
+          // is a page-owned change that ends the presentation.
+          (change.element === background &&
+            change.property === 'background-color' &&
+            change.element.style.getPropertyValue(change.property) === change.value) ||
           (change.element.style.getPropertyValue(change.property) === change.applied &&
             change.element.style.getPropertyPriority(change.property) === change.appliedPriority),
       )
     ) {
-      this.updateBackground(entry, background);
-      return { restored: false, root: null, element };
+      const moved = this.retarget(entry);
+      this.updateBackground(
+        moved ?? entry,
+        moved === null
+          ? background
+          : adBackgroundColorTarget(moved.element, moved.target, moved.kind),
+      );
+      return { restored: false, retargeted: moved !== null, root: null, element };
     }
     const root = entry.target.isConnected ? entry.target : element.isConnected ? element : null;
     return {
       element,
       restored: this.restore(element),
+      retargeted: false,
       root,
     };
   }

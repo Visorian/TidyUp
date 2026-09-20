@@ -27,7 +27,8 @@ function parseDisplay(value: unknown): CandidateDisplay | null {
     value['images'] < 0 ||
     value['images'] > 80 ||
     typeof value['backgroundImage'] !== 'boolean' ||
-    typeof value['labelOnly'] !== 'boolean'
+    typeof value['labelOnly'] !== 'boolean' ||
+    typeof value['fullViewport'] !== 'boolean'
   )
     return null;
   return {
@@ -37,6 +38,7 @@ function parseDisplay(value: unknown): CandidateDisplay | null {
     images: value['images'],
     backgroundImage: value['backgroundImage'],
     labelOnly: value['labelOnly'],
+    fullViewport: value['fullViewport'],
   };
 }
 
@@ -55,7 +57,7 @@ export function parseCandidates(value: unknown, pageHost: string): readonly AdCa
       typeof item['text'] !== 'string' ||
       item['text'].length > LIMITS.text ||
       item['pageHost'] !== pageHost ||
-      (item['kind'] !== undefined && item['kind'] !== 'consent' && item['kind'] !== 'background') ||
+      (item['kind'] !== undefined && item['kind'] !== 'overlay' && item['kind'] !== 'background') ||
       !strings(item['labels'], 12, 40) ||
       !strings(item['linkHosts'], 8, 253) ||
       !item['linkHosts'].every(isPublicHost) ||
