@@ -3,7 +3,7 @@ import { candidateFingerprint } from '../candidates/fingerprint';
 import { activeRules } from '../config/categories';
 import type { AdCandidate, CandidateClassification, Settings } from '../shared/types';
 import { isCacheEnabled, isRecord, parseRuleProbabilities } from '../shared/validation';
-import { POLICY_VERSION } from './policy';
+import { policyKey } from './cache';
 
 const STORAGE_KEY = 'replayCache';
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -166,7 +166,7 @@ export async function getReplayEntries(
   // Regions are learned per site so a locator also applies to pages that were never classified.
   const [site, policy, cache] = await Promise.all([
     hash(host),
-    hash(JSON.stringify([POLICY_VERSION, settings])),
+    hash(policyKey(settings)),
     readCache(),
   ]);
   return {
@@ -217,7 +217,7 @@ export async function rememberReplay(
     return;
   const [site, policy, fingerprintHash] = await Promise.all([
     hash(host),
-    hash(JSON.stringify([POLICY_VERSION, settings])),
+    hash(policyKey(settings)),
     slotFingerprint === undefined ? hashReplayFingerprint(candidate) : hash(slotFingerprint),
   ]);
   await storeReplay(

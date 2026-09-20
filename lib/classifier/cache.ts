@@ -39,13 +39,19 @@ async function hash(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function lookups(candidates: readonly AdCandidate[], settings: Settings): Promise<Lookup[]> {
-  const policy = JSON.stringify([
+// Only the provider, model and active rules can change a decision; other preferences decide
+// whether a cache is consulted, not what it says.
+export function policyKey(settings: Settings): string {
+  return JSON.stringify([
     POLICY_VERSION,
     PROVIDERS[settings.provider],
     settings.model,
     activeRules(settings),
   ]);
+}
+
+function lookups(candidates: readonly AdCandidate[], settings: Settings): Promise<Lookup[]> {
+  const policy = policyKey(settings);
   return Promise.all(
     candidates.map(async (candidate) => ({
       candidate,

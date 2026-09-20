@@ -72,12 +72,18 @@ it('remembers a locator for the whole site and stores hashed content and policy'
 });
 
 it.each([
-  { ...settings, threshold: 0.95 },
   { ...settings, rules: ['Hide subscriptions.'] },
   { ...settings, provider: 'openrouter' as const },
-])('invalidates learned locators when settings change', async (changed: Settings) => {
+])('invalidates learned locators when the decision policy changes', async (changed: Settings) => {
   await remember();
   expect((await getReplayEntries(url, changed)).entries).toEqual([]);
+});
+
+it('keeps learned locators across unrelated preferences and honours the threshold', async () => {
+  await remember();
+  const relaxed = { ...settings, threshold: 0.8, disabledSites: ['other.example.org'] };
+  expect((await getReplayEntries(url, relaxed)).entries).toHaveLength(1);
+  expect((await getReplayEntries(url, { ...settings, threshold: 0.995 })).entries).toEqual([]);
 });
 
 it.each([
