@@ -38,6 +38,7 @@ function createFixtures(): void {
       <iframe title="SP Consent Message" src="about:blank" width="500" height="300"></iframe>
     </div>
     <div id="ads">
+      <div id="sp_message_container_1426772" class="Ad-Slot"><span>Anzeige</span></div>
       <div id="ad-7687366005231715545" class="Ad-Slot"><span>Anzeige</span></div>
       <div id="sidebar-ads" class="Ad-Slot"><span>Anzeige</span></div>
     </div>

@@ -1,4 +1,9 @@
-import { adSlotFingerprint, findAdSlot, isStableIdentifier } from '../blocking/ad-slot';
+import {
+  adSlotFingerprint,
+  findAdSlot,
+  isStableIdentifier,
+  stableIdentifierPrefix,
+} from '../blocking/ad-slot';
 import { extractCandidate } from '../candidates/extract';
 import { candidateFingerprint } from '../candidates/fingerprint';
 import { parseReplaySnapshot, type ReplayEntry } from '../classifier/replay-cache';
@@ -6,18 +11,21 @@ import type { AdCandidate, CandidateClassification, Settings } from '../shared/t
 import { isCacheEnabled, isRecord } from '../shared/validation';
 import { send } from './messages';
 
+function anchor(element: Element): string {
+  if (isStableIdentifier(element.id)) return `${element.localName}#${CSS.escape(element.id)}`;
+  const prefix = stableIdentifierPrefix(element.id);
+  if (prefix !== null) return `${element.localName}[id^="${prefix}"]`;
+  const siblings = element.parentElement?.children;
+  const index = siblings === undefined ? 1 : [...siblings].indexOf(element) + 1;
+  return `${element.localName}:nth-child(${index})`;
+}
+
 export function regionSelector(element: Element): string | null {
   if (element.getRootNode() !== document) return null;
   const parts: string[] = [];
   let current: Element | null = element;
   while (current !== null && parts.length < 12) {
-    if (isStableIdentifier(current.id))
-      parts.unshift(`${current.localName}#${CSS.escape(current.id)}`);
-    else {
-      const siblings = current.parentElement?.children;
-      const index = siblings === undefined ? 1 : [...siblings].indexOf(current) + 1;
-      parts.unshift(`${current.localName}:nth-child(${index})`);
-    }
+    parts.unshift(anchor(current));
     const selector = parts.join(' > ');
     if (selector.length > 1000) return null;
     const matches = document.querySelectorAll(selector);

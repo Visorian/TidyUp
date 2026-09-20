@@ -14,6 +14,10 @@ export function checkLearnedLocators(): string {
     regionSelector(element('sidebar-ads')) === 'div#sidebar-ads',
     'Stable identifiers must anchor a learned locator',
   );
+  assert(
+    regionSelector(element('sp_message_container_1426772')) === 'div[id^="sp_message_container_"]',
+    'A generated identifier must anchor on the part the site chose',
+  );
   return 'Learned locators skip generated identifiers and resolve back to their region';
 }
 

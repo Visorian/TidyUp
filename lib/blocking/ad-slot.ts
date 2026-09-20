@@ -25,6 +25,12 @@ export function isStableIdentifier(id: string): boolean {
   return id !== '' && !GENERATED.test(id);
 }
 
+// A generated identifier still opens with the part the site chose, which stays across loads.
+export function stableIdentifierPrefix(id: string): string | null {
+  const prefix = id.split(GENERATED)[0] ?? '';
+  return prefix.length >= 4 && /^[\w-]+$/u.test(prefix) ? prefix : null;
+}
+
 export function adSlotFingerprint(element: Element): string | null {
   if (
     !isSlotElement(element) ||
