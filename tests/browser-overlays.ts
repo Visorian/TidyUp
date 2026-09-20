@@ -119,6 +119,11 @@ export function checkFrozenPageScroll(store: Readonly<PresentationStore>): strin
     assert(hide(store, 'consent'), 'Consent overlay should hide');
     assert(getComputedStyle(body).position === 'static', 'A frozen page must scroll again');
     assert(Math.round(window.scrollY) === 320, 'Unlocking must keep the reading position');
+    // A consent script can freeze the page again after its dialog was removed.
+    body.style.setProperty('position', 'fixed', 'important');
+    store.queueChanges([body]);
+    assert(store.restoreNext()?.restored === false, 'A late freeze must not restore the overlay');
+    assert(getComputedStyle(body).position === 'static', 'A late freeze must be released too');
     store.restoreAll();
     assert(getComputedStyle(body).position === 'fixed', 'Revealing returns the page freeze');
   } finally {

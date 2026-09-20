@@ -181,6 +181,26 @@ export class PresentationStore {
     return moved;
   }
 
+  private holds(entry: Readonly<Presentation>, background: HTMLElement | null): boolean {
+    const { element } = entry;
+    return (
+      element.isConnected &&
+      (entry.kind !== undefined || safePresentation(element)) &&
+      (entry.target === element || isAdContainer(entry.target, element)) &&
+      fingerprint(element, entry.kind) === entry.fingerprint &&
+      entry.changes.every(
+        (change) =>
+          // An ad script reapplying the colour we removed stays ours to clean; any other value
+          // is a page-owned change that ends the presentation.
+          (change.element === background &&
+            change.property === 'background-color' &&
+            change.element.style.getPropertyValue(change.property) === change.value) ||
+          (change.element.style.getPropertyValue(change.property) === change.applied &&
+            change.element.style.getPropertyPriority(change.property) === change.appliedPriority),
+      )
+    );
+  }
+
   restoreNext():
     | {
         readonly restored: boolean;
@@ -198,22 +218,9 @@ export class PresentationStore {
       entry.debug || entry.kind === 'background'
         ? null
         : adBackgroundColorTarget(entry.element, entry.target, entry.kind);
-    if (
-      element.isConnected &&
-      (entry.kind !== undefined || safePresentation(element)) &&
-      (entry.target === element || isAdContainer(entry.target, entry.element)) &&
-      fingerprint(element, entry.kind) === entry.fingerprint &&
-      entry.changes.every(
-        (change) =>
-          // An ad script reapplying the colour we removed stays ours to clean; any other value
-          // is a page-owned change that ends the presentation.
-          (change.element === background &&
-            change.property === 'background-color' &&
-            change.element.style.getPropertyValue(change.property) === change.value) ||
-          (change.element.style.getPropertyValue(change.property) === change.applied &&
-            change.element.style.getPropertyPriority(change.property) === change.appliedPriority),
-      )
-    ) {
+    if (this.holds(entry, background)) {
+      // The page can freeze scrolling after its overlay was hidden, so keep handing it back.
+      if (entry.kind === 'overlay' && !entry.debug) this.scrollLocks.unlock(entry.element);
       const moved = this.retarget(entry);
       this.updateBackground(
         moved ?? entry,

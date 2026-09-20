@@ -9,29 +9,18 @@ interface ScrollLock {
 export class ScrollLocks {
   private readonly locks = new Map<Document, ScrollLock>();
 
+  // A page can be frozen after its overlay was hidden, so every revisit releases what is locked
+  // now and keeps the earlier changes for restoration.
   unlock(element: HTMLElement): void {
     const document = element.ownerDocument;
     const existing = this.locks.get(document);
-    if (existing !== undefined) {
-      existing.overlays.add(element);
-      return;
-    }
-    const changes: StyleChange[] = [];
-    for (const root of [document.documentElement, document.body]) {
-      if (root === null) continue;
-      const style = document.defaultView?.getComputedStyle(root);
-      if (style === undefined) continue;
-      for (const property of ['overflow-x', 'overflow-y']) {
-        if (['hidden', 'clip'].includes(style.getPropertyValue(property)))
-          changes.push(changeStyle(root, property, 'auto'));
-      }
-      // A page frozen out of flow keeps the reading position in its own top edge.
-      if (style.position !== 'fixed') continue;
-      const offset = Number(style.top.replace('px', ''));
-      changes.push(changeStyle(root, 'position', 'static'));
-      if (offset < 0) document.defaultView?.scrollTo(0, -offset);
-    }
-    this.locks.set(document, { overlays: new Set([element]), changes });
+    const changes = release(document);
+    const overlays = existing?.overlays ?? new Set<Element>();
+    overlays.add(element);
+    this.locks.set(document, {
+      overlays,
+      changes: existing === undefined ? changes : [...existing.changes, ...changes],
+    });
   }
 
   restore(element: HTMLElement): void {
@@ -43,4 +32,23 @@ export class ScrollLocks {
     for (const change of lock.changes) restoreStyle(change);
     this.locks.delete(document);
   }
+}
+
+function release(document: Document): StyleChange[] {
+  const changes: StyleChange[] = [];
+  for (const root of [document.documentElement, document.body]) {
+    if (root === null) continue;
+    const style = document.defaultView?.getComputedStyle(root);
+    if (style === undefined) continue;
+    for (const property of ['overflow-x', 'overflow-y']) {
+      if (['hidden', 'clip'].includes(style.getPropertyValue(property)))
+        changes.push(changeStyle(root, property, 'auto'));
+    }
+    // A page frozen out of flow keeps the reading position in its own top edge.
+    if (style.position !== 'fixed') continue;
+    const offset = Number(style.top.replace('px', ''));
+    changes.push(changeStyle(root, 'position', 'static'));
+    if (offset < 0) document.defaultView?.scrollTo(0, -offset);
+  }
+  return changes;
 }
