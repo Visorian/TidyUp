@@ -25,6 +25,11 @@ export class ScrollLocks {
         if (['hidden', 'clip'].includes(style.getPropertyValue(property)))
           changes.push(changeStyle(root, property, 'auto'));
       }
+      // A page frozen out of flow keeps the reading position in its own top edge.
+      if (style.position !== 'fixed') continue;
+      const offset = Number(style.top.replace('px', ''));
+      changes.push(changeStyle(root, 'position', 'static'));
+      if (offset < 0) document.defaultView?.scrollTo(0, -offset);
     }
     this.locks.set(document, { overlays: new Set([element]), changes });
   }

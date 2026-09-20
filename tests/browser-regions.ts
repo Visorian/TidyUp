@@ -3,6 +3,15 @@ import { capturePageBackground } from '../lib/blocking/background-color';
 import { PresentationStore } from '../lib/blocking/hide';
 import { extractCandidate } from '../lib/candidates/extract';
 import { checkLearnedLocators, checkPageSkinEvidence } from './browser-locators';
+import {
+  checkConsentPrivacy,
+  checkConsentScroll,
+  checkDebugConsent,
+  checkFrozenPageScroll,
+  checkLongConsent,
+  checkNotificationPrompt,
+  checkPrivacyCenterWording,
+} from './browser-overlays';
 import { assert, candidate, element } from './browser-support';
 import { candidateFingerprint } from '../lib/candidates/fingerprint';
 
@@ -68,52 +77,6 @@ function checkDisplayBanner(store: Readonly<PresentationStore>): string {
   return 'Image banners with German advertising labels remain supported';
 }
 
-function checkConsentScroll(store: Readonly<PresentationStore>): string {
-  document.body.style.setProperty('overflow', 'hidden', 'important');
-  document.documentElement.style.overflowY = 'clip';
-  const bodyBefore = document.body.style.cssText;
-  const rootBefore = document.documentElement.style.cssText;
-  let clicks = 0;
-  element('agree').addEventListener('click', () => {
-    clicks++;
-  });
-  assert(candidate('consent').kind === 'overlay', 'Consent iframe wrapper must be identified');
-  assert(hide(store, 'consent'), 'Consent wrapper should hide');
-  assert(getComputedStyle(element('consent')).display === 'none', 'Whole dialog must hide');
-  assert(getComputedStyle(document.body).overflowY === 'auto', 'Body scroll must unlock');
-  assert(
-    getComputedStyle(document.documentElement).overflowY === 'auto',
-    'Root scroll must unlock',
-  );
-  assert(hide(store, 'second'), 'Second consent overlay should hide');
-  store.restore(element('consent'));
-  assert(
-    getComputedStyle(document.body).overflowY === 'auto',
-    'Keep scroll unlocked for remaining overlay',
-  );
-  store.restoreAll();
-  assert(document.body.style.cssText === bodyBefore, 'Original inline scroll lock must return');
-  assert(document.documentElement.style.cssText === rootBefore, 'Original root styles must return');
-  assert(clicks === 0, 'Hiding must not choose consent');
-  return 'Consent wrappers and scroll locks restore without clicking consent controls';
-}
-
-function checkNotificationPrompt(store: Readonly<PresentationStore>): string {
-  const prompt = candidate('notify');
-  assert(prompt.kind === 'overlay', 'Notification prompts must be summarized as one overlay');
-  assert(prompt.labels.includes('modal dialog'), 'Modal dialogs must be labelled for rules');
-  assert(!prompt.labels.includes('consent overlay'), 'Consent wording must stay its own signal');
-  assert(prompt.text.includes('Benachrichtigungen'), 'Prompt copy must reach the classifier');
-  assert(
-    extractCandidate(element('allow'), 'allow', 'news.example.org') === null,
-    'Prompt controls must not be classified separately',
-  );
-  assert(hide(store, 'notify'), 'A matching rule should hide the prompt');
-  assert(getComputedStyle(element('notify')).display === 'none', 'Whole prompt must hide');
-  store.restoreAll();
-  return 'Notification permission prompts reach user rules without consent wording';
-}
-
 function checkPageBrandingColor(store: Readonly<PresentationStore>): string {
   const body = document.body;
   body.style.setProperty('background-color', 'rgb(255, 204, 0)');
@@ -133,63 +96,6 @@ function checkPageBrandingColor(store: Readonly<PresentationStore>): string {
     body.style.removeProperty('background-color');
   }
   return 'Page colors that arrive with an ad are removed and restored with it';
-}
-
-function checkPrivacyCenterWording(): string {
-  const frame = element('consent').querySelector('iframe');
-  assert(frame !== null, 'Consent fixture needs its frame');
-  const title = frame.getAttribute('title') ?? '';
-  frame.setAttribute('title', 'Privacy Center');
-  try {
-    assert(
-      candidate('consent').labels.includes('consent overlay'),
-      'A privacy centre overlay must carry consent evidence',
-    );
-  } finally {
-    frame.setAttribute('title', title);
-  }
-  return 'Privacy wording marks an overlay as consent evidence';
-}
-
-function checkDebugConsent(store: Readonly<PresentationStore>): string {
-  const bodyBefore = document.body.style.cssText;
-  assert(!hide(store, 'consent', true), 'Debug mode must not hide');
-  assert(getComputedStyle(element('consent')).display !== 'none', 'Debug dialog remains visible');
-  assert(document.body.style.cssText === bodyBefore, 'Debug mode must not unlock scrolling');
-  store.restoreAll();
-  assert(element('consent').style.outline === '', 'Debug outline must restore');
-  return 'Debug mode leaves consent and scrolling unchanged';
-}
-
-function checkConsentPrivacy(): string {
-  assert(
-    extractCandidate(element('agree'), 'agree', 'news.example.org') === null,
-    'Dialog descendants must not be independently hidden',
-  );
-  element('second').insertAdjacentHTML('beforeend', '<input value="PRIVATE_CONSENT_SECRET">');
-  assert(
-    extractCandidate(element('second'), 'second', 'news.example.org') === null,
-    'Consent settings containing inputs must remain private',
-  );
-  element('second').querySelector('input')?.remove();
-  return 'Consent forms stay private and dialog controls are not classified separately';
-}
-
-function checkLongConsent(store: Readonly<PresentationStore>): string {
-  const paragraph = document.createElement('p');
-  paragraph.textContent = 'We use cookies. '.repeat(80) + 'person@example.org token=PRIVATE_TOKEN';
-  element('second').append(paragraph);
-  const longConsent = candidate('second');
-  assert(longConsent.text.length <= 400, 'Long consent text must remain bounded');
-  assert(!JSON.stringify(longConsent).includes('PRIVATE_TOKEN'), 'Credentials must not leak');
-  assert(hide(store, 'second'), 'Long consent overlay should hide');
-  element('second').insertAdjacentHTML('beforeend', '<input value="NEW_PRIVATE_FIELD">');
-  store.queueChanges([element('second')]);
-  assert(
-    store.restoreNext()?.restored === true,
-    'A reused dialog with private fields must restore',
-  );
-  return 'Long consent copy is bounded and reused dialogs restore';
 }
 
 function checkPageOwnedStyles(store: Readonly<PresentationStore>): string {
@@ -278,6 +184,7 @@ export async function runRegionChecks(): Promise<readonly string[]> {
       checkPageSkinEvidence(),
       checkPageBrandingColor(store),
       checkPrivacyCenterWording(),
+      checkFrozenPageScroll(store),
       checkDebugConsent(store),
       checkSelection(),
       checkConsentPrivacy(),
